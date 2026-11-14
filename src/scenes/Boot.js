@@ -13,6 +13,10 @@ export default class Boot extends Phaser.Scene {
   create() {
     makeTextures(this);
     const kick = new URLSearchParams(location.search).get('kick');
-    this.scene.start('Climb', { kick: kick === null ? 0.5 : Number(kick) });
+    if (kick === null) {
+      this.scene.start('Intro');
+    } else {
+      this.scene.start('Climb', { kick: Number(kick) });
+    }
   }
 }
