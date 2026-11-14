@@ -66,6 +66,7 @@ export const rollers = {
   maxSpeed: 240,
   radius: 28,
   drain: 0.1,
+  freezeTime: 2,
 };
 
 export const pickups = {

@@ -454,7 +454,7 @@ export default class Climb extends Phaser.Scene {
 
   megaBounce() {
     const player = this.player;
-    if (this.run.grit < 1 || !this.run.started || this.run.done || player.mode === 'done') return;
+    if (this.run.grit < 1 || !this.run.started || this.run.done || player.mode === 'done' || player.mode === 'stunned') return;
     this.run.grit = 0;
     player.mega();
     this.slowLeft = 0.35;
@@ -533,8 +533,7 @@ export default class Climb extends Phaser.Scene {
           player.bounce(0, 40, true);
           sfx.stomp();
           this.puff(ball.x, ball.y - r, 0xffffff, 8);
-        } else if (player.hurt(ball.x, rollers.drain)) {
-          this.floatText(player.x, player.y - 60, 'SPLAT!', '#caf0f8');
+        } else if (player.freeze(ball.x, rollers.drain, rollers.freezeTime)) {
           this.cameras.main.shake(160, 0.006);
           this.addGrit(grit.roller);
           this.splat(ball.x, ball.y + r);
@@ -629,7 +628,7 @@ export default class Climb extends Phaser.Scene {
       if (centered && player.mode === 'air' && player.vy > 0 && me.bottom < bounds.top + (bites ? 12 : 16)) {
         this.stomp(enemy);
       } else if (player.hurt(enemy.x, enemy.kind === 'yeti' ? pogo.yetiDrain : pogo.hitDrain)) {
-        this.floatText(player.x, player.y - 60, bites ? 'BITE!' : '-SPRING', '#ef476f');
+        this.floatText(player.x, player.y - (player.mode === 'stunned' ? 88 : 60), bites ? 'BITE!' : '-SPRING', '#ef476f');
         this.addGrit(enemy.kind === 'yeti' ? grit.yeti : grit.hit);
       }
     }
@@ -647,7 +646,7 @@ export default class Climb extends Phaser.Scene {
 
       const hitPlayer = Math.abs(ball.x - player.x) < 12 && ball.y > me.top && ball.y < me.bottom;
       if (hitPlayer && player.hurt(ball.x, pogo.snowballDrain)) {
-        this.floatText(player.x, player.y - 60, 'SPLAT!', '#caf0f8');
+        this.floatText(player.x, player.y - (player.mode === 'stunned' ? 88 : 60), 'SPLAT!', '#caf0f8');
         this.addGrit(grit.snowball);
       }
       if (hitPlayer || ball.age > 3 || ball.y > this.mountain.heightAt(ball.x)) {

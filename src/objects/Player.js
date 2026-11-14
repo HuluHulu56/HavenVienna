@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { pogo, gravity, maxFall, mega } from '../config.js';
 import { tex } from '../assets.js';
 import { sfx } from '../sfx.js';
+import { textStyle } from '../util.js';
 
 // x, y is the rubber foot of the pogo stick
 export default class Player {
@@ -20,6 +21,7 @@ export default class Player {
     this.charge = 0;
     this.superLeft = 0;
     this.hurtLeft = 0;
+    this.freezeLeft = 0;
     this.megaLeft = 0;
     this.squash = 1;
     this.onIce = false;
@@ -100,11 +102,58 @@ export default class Player {
     if (this.hurtLeft > 0 || this.megaLeft > 0 || this.mode === 'done') return false;
     this.addSpring(-drain);
     this.hurtLeft = pogo.hurtTime;
-    this.mode = 'air';
-    this.vx = this.x < fromX ? -200 : 200;
-    this.vy = -300;
+    if (this.mode !== 'stunned') {
+      this.mode = 'air';
+      this.vx = this.x < fromX ? -200 : 200;
+      this.vy = -300;
+    }
     sfx.hit();
     return true;
+  }
+
+  freeze(fromX, drain, duration) {
+    if (!this.hurt(fromX, drain)) return false;
+    if (this.mode === 'stunned') return true;
+    this.mode = 'stunned';
+    this.freezeLeft = duration;
+    this.hurtLeft = 0;
+    this.y = this.mountain.heightAt(this.x);
+    this.vx = 0;
+    this.vy = 0;
+    this.tilt = 0;
+    this.charge = 0;
+    this.onIce = false;
+    this.squash = 1;
+    if (!this.ice) this.makeIce();
+    this.ice.setPosition(this.x, this.y).setVisible(true);
+    this.freezeTimer.setPosition(this.x, this.y - 60).setText(`${duration.toFixed(1)}s`).setVisible(true);
+    return true;
+  }
+
+  makeIce() {
+    const ice = this.scene.add.graphics().setDepth(11);
+    ice.fillStyle(0x8de2ff, 0.3).lineStyle(2, 0x9be6ff, 0.95);
+    ice.beginPath();
+    ice.moveTo(-15, -8);
+    ice.lineTo(-16, -38);
+    ice.lineTo(-10, -50);
+    ice.lineTo(8, -53);
+    ice.lineTo(16, -43);
+    ice.lineTo(17, -10);
+    ice.lineTo(10, 0);
+    ice.lineTo(-9, 0);
+    ice.closePath();
+    ice.fillPath();
+    ice.strokePath();
+    ice.fillStyle(0x318bc4, 0.4).fillTriangle(10, 0, 17, -10, 16, -43);
+    ice.fillStyle(0xedfbff, 0.75).fillTriangle(-15, -38, -10, -50, 8, -53);
+    ice.lineStyle(2, 0xedfbff, 0.9);
+    ice.lineBetween(-11, -32, -11, -22);
+    ice.lineBetween(-10, -32, -6, -38);
+    ice.lineBetween(6, -8, 11, -14);
+    this.ice = ice;
+    this.freezeTimer = this.scene.add.text(0, 0, '', { ...textStyle, fontSize: '12px', color: '#caf0f8' })
+      .setOrigin(0.5, 1).setDepth(25);
   }
 
   supercharge() {
@@ -123,7 +172,7 @@ export default class Player {
     const dir = (right ? 1 : 0) - (left ? 1 : 0);
     const mountain = this.mountain;
 
-    if (dir) this.tilt = Phaser.Math.Clamp(this.tilt + dir * pogo.tiltSpeed * dt, -1, 1);
+    if (dir && this.mode !== 'stunned') this.tilt = Phaser.Math.Clamp(this.tilt + dir * pogo.tiltSpeed * dt, -1, 1);
     else this.tilt -= Math.sign(this.tilt) * Math.min(Math.abs(this.tilt), pogo.tiltBack * dt);
 
     if (this.mode === 'air') {
@@ -175,6 +224,10 @@ export default class Player {
 
     if (this.superLeft > 0) this.superLeft -= dt;
     if (this.hurtLeft > 0) this.hurtLeft -= dt;
+    if (this.mode === 'stunned') {
+      this.freezeLeft = Math.max(0, this.freezeLeft - dt);
+      if (this.freezeLeft === 0) this.mode = 'air';
+    }
     this.updateSprite(dt);
   }
 
@@ -199,6 +252,7 @@ export default class Player {
   }
 
   updateSprite(dt) {
+    const frozen = this.mode === 'stunned';
     const target = this.mode === 'crouch' ? 1 - 0.35 * this.charge : 1;
     this.squash += (target - this.squash) * Math.min(1, dt * 14);
 
@@ -208,9 +262,15 @@ export default class Player {
     if (this.mode === 'skid') this.sprite.rotation += Math.sin(this.scene.time.now / 25) * 0.2;
     // one big front flip during a mega bounce
     if (this.megaLeft > 0) this.sprite.rotation += (1 - this.megaLeft / mega.flight) * Math.PI * 2;
-    this.sprite.setAlpha(this.hurtLeft > 0 && Math.floor(this.hurtLeft * 20) % 2 ? 0.35 : 1);
+    this.sprite.setAlpha(!frozen && this.hurtLeft > 0 && Math.floor(this.hurtLeft * 20) % 2 ? 0.35 : 1);
 
-    if (this.supercharged) this.sprite.setTint(Math.floor(this.superLeft * 10) % 2 ? 0xffe066 : 0xffffff);
+    if (frozen) this.sprite.setTint(0xa8e4ff);
+    else if (this.supercharged) this.sprite.setTint(Math.floor(this.superLeft * 10) % 2 ? 0xffe066 : 0xffffff);
     else this.sprite.clearTint();
+    if (this.ice) {
+      this.ice.setVisible(frozen);
+      this.freezeTimer.setVisible(frozen);
+      if (frozen) this.freezeTimer.setText(`${(Math.ceil(this.freezeLeft * 10) / 10).toFixed(1)}s`);
+    }
   }
 }
