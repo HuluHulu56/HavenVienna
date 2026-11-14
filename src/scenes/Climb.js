@@ -465,7 +465,7 @@ export default class Climb extends Phaser.Scene {
   throwSnowball(tourist) {
     const player = this.player;
     const fromY = tourist.y - 30;
-    const time = Phaser.Math.Clamp(Math.abs(player.x - tourist.x) / 340, 0.4, 1.1);
+    const time = Phaser.Math.Clamp(Math.abs(player.x - tourist.x) / 380, 0.36, 0.99);
     // aim a bit ahead of where you're going
     const dx = player.x + player.vx * time * 0.8 - tourist.x;
     const dy = player.y - 22 - fromY;

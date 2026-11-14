@@ -22,7 +22,7 @@ export default class Enemy {
     this.hopTime = 0.5;
     this.hopHeight = 36;
     this.hopWait = Phaser.Math.FloatBetween(1, 3);
-    this.throwWait = Phaser.Math.FloatBetween(1.5, 3);
+    this.throwWait = Phaser.Math.FloatBetween(1.1, 2.1);
     this.chasing = false;
     this.dead = false;
 
@@ -60,7 +60,7 @@ export default class Enemy {
       this.throwWait -= dt;
       const close = Math.abs(player.x - this.x) < 470 && Math.abs(player.y - this.y) < 280;
       if (close && this.throwWait <= 0) {
-        this.throwWait = Phaser.Math.FloatBetween(1.8, 2.8);
+        this.throwWait = Phaser.Math.FloatBetween(1.25, 1.95);
         this.scene.throwSnowball(this);
         if (Math.random() < 0.15) this.scene.time.delayedCall(220, () => !this.dead && this.scene.throwSnowball(this));
       }
