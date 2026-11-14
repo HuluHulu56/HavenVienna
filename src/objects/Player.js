@@ -122,8 +122,10 @@ export default class Player {
       this.y += this.vy * dt;
       this.keepInWorld();
 
-      // bumped into a rock wall instead of clearing it
-      if (this.y > mountain.heightAt(this.x) + 2 && mountain.heightAt(fromX) - mountain.heightAt(this.x) > 10) {
+      // bumped into a rock wall instead of clearing it, checked at the front of the sprite not the middle
+      const front = Math.sign(this.vx) * 8;
+      const ahead = mountain.heightAt(this.x + front);
+      if (front && this.y > ahead + 2 && mountain.heightAt(fromX + front) - ahead > 10) {
         this.x = fromX;
         this.vx = -this.vx * 0.3;
         this.scene.events.emit('bonk');

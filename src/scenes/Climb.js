@@ -138,12 +138,13 @@ export default class Climb extends Phaser.Scene {
       for (let i = 1; i < top.length; i++) {
         const a = top[i - 1];
         const b = top[i];
+        // no grass strip down the face of a rock wall
+        if (Math.abs(b.y - a.y) > 30) continue;
         const color = surfaceColor((a.x + b.x) / 2);
         edge.lineStyle(14, color).lineBetween(a.x, a.y + 5, b.x, b.y + 5);
         edge.fillStyle(color).fillCircle(b.x, b.y + 5, 7);
+        edge.lineStyle(3, 0x000000, 0.15).lineBetween(a.x, a.y + 12, b.x, b.y + 12);
       }
-      edge.lineStyle(3, 0x000000, 0.15);
-      edge.strokePoints(top.map((p) => new Phaser.Math.Vector2(p.x, p.y + 12)));
 
       this.chunks.push({ from, to, parts: [fill, edge] });
     }
@@ -208,18 +209,81 @@ export default class Climb extends Phaser.Scene {
     this.add.text(x, groundY - 34, '2962 m', ink).setDepth(2.1);
   }
 
+  // lumpy stack of rock chunks, drawn on the solid side of the wall so it matches where you bump
   drawWall(wall) {
-    const { lineAt } = this.mountain;
+    const { lineAt, progressAt } = this.mountain;
     const top = lineAt(wall.x);
-    const bottom = top + wall.h;
+    const bottom = lineAt(wall.x - 2);
+    const zone = zoneAt(progressAt(wall.x));
+    const [base, shade, light] = [
+      [0x8a7a68, 0x4a3f35, 0xb3a28c],
+      [0x949dab, 0x4f5666, 0xc9d0da],
+      [0xa3b0c1, 0x5a6780, 0xe2e9f1],
+    ][zone];
+    let seed = wall.x;
+    const rand = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+
     const g = this.add.graphics().setDepth(3.2);
-    g.fillStyle(0x4a4e5a).fillRect(wall.x - 18, top, 20, wall.h + 6);
-    g.fillStyle(0x6c7486).fillRect(wall.x - 14, top + 4, 12, wall.h);
-    g.fillStyle(0x8d99ae);
-    for (let y = top + 14; y < bottom - 6; y += 22) g.fillRect(wall.x - 12, y, 8, 3);
-    g.fillStyle(0x2f3340);
-    for (let y = top + 24; y < bottom - 6; y += 30) g.fillRect(wall.x - 16, y, 3, 10);
-    g.fillStyle(surfaceColors[zones[zoneAt(this.mountain.progressAt(wall.x))].surface]).fillRect(wall.x - 20, top - 2, 26, 7);
+    const depth = 36;
+    g.fillStyle(0x000000, 0.18).fillEllipse(wall.x - 12, bottom + 2, 44, 8);
+
+    // chunks with slanted joints, from the bottom up
+    let low = bottom + 4;
+    let lowRight = bottom + 4;
+    while (low > top + 4) {
+      const h = 12 + rand() * 22;
+      const high = Math.max(top, low - h);
+      const highRight = Math.max(top, lowRight - h + (rand() - 0.5) * 14);
+      const left = wall.x - 3 + rand() * 7;
+      const bulge = wall.x - 3 - rand() * 2;
+      const mid = (low + high) / 2 + (rand() - 0.5) * 6;
+      // the back of each chunk is ragged and a different length so it melts into the soil
+      const reach = wall.x + 14 + rand() * (depth - 4);
+      const backMid = (highRight + lowRight) / 2;
+      const outer = [
+        { x: left, y: low }, { x: bulge, y: mid }, { x: left + rand() * 3, y: high },
+        { x: reach - 4 + rand() * 4, y: highRight }, { x: reach + 4 + rand() * 6, y: backMid },
+        { x: reach - 6 + rand() * 4, y: lowRight },
+      ];
+      g.fillStyle(shade).fillPoints(outer, true);
+      g.fillStyle(base).fillPoints([
+        { x: left + 3, y: low - 3 }, { x: bulge + 4, y: mid }, { x: outer[2].x + 3, y: high + 3 },
+        { x: outer[3].x - 3, y: highRight + 3 }, { x: outer[4].x - 4, y: backMid }, { x: outer[5].x - 3, y: lowRight - 3 },
+      ], true);
+      g.fillStyle(light).fillPoints([
+        { x: outer[2].x + 3, y: high + 2 }, { x: outer[3].x - 3, y: highRight + 2 },
+        { x: outer[3].x - 4, y: highRight + 4 }, { x: outer[2].x + 5, y: high + 4 },
+      ], true);
+      for (let i = 0; i < 4; i++) {
+        g.fillStyle(i % 2 ? light : shade).fillRect(wall.x + 2 + rand() * (reach - wall.x - 8), high + 5 + rand() * Math.max(1, h - 10), 2, 2);
+      }
+      if (h > 20) g.fillStyle(shade).fillRect(wall.x + 4 + rand() * 18, mid - 6, 2, 10);
+      g.lineStyle(2, 0x2b2d42, 0.75).lineBetween(left, low, bulge, mid).lineBetween(bulge, mid, outer[2].x, high);
+      low = high;
+      lowRight = highRight;
+    }
+
+    // stones stuck in the soil behind the wall, thinning out the further back they are
+    for (let i = 0; i < 22; i++) {
+      const x = wall.x + depth - 4 + Math.pow(rand(), 1.6) * 90;
+      const y = top + 8 + rand() * (bottom - top + 10);
+      if (y < lineAt(x) + 10) continue;
+      const size = 2 + rand() * 4;
+      g.fillStyle(shade).fillRect(x - 1, y - 1, size + 2, size * 0.7 + 2);
+      g.fillStyle(rand() < 0.5 ? base : light).fillRect(x, y, size, size * 0.7);
+    }
+
+    // rubble at the foot
+    for (let i = 0; i < 7; i++) {
+      g.fillStyle(i % 2 ? base : shade).fillCircle(wall.x - 6 - rand() * 30, bottom + 1 - rand() * 2, 2 + rand() * 3);
+    }
+
+    // grass or snow lip with a few bits hanging over
+    g.fillStyle(surfaceColors[zones[zone].surface]).fillRect(wall.x - 5, top - 3, depth + 8, 8);
+    for (let i = 0; i < 4; i++) g.fillRect(wall.x - 4 + i * 5, top + 4, 2, 2 + rand() * 5);
   }
 
   // hides the straight cut between two soil types behind a ragged pixel edge

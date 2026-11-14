@@ -17,7 +17,7 @@ export const pogo = {
   maxBounce: 150,
   superBonus: 0.6,
   chargeBoost: 80,
-  crouchTime: 0.6,
+  crouchTime: 0.35,
   launchSpeed: 190,
   airAccel: 300,
   airSpeed: 210,
