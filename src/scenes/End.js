@@ -175,7 +175,7 @@ export default class End extends Phaser.Scene {
 
     this.stamp = this.textures.exists('stampBest')
       ? this.add.image(-84, 58, 'stampBest')
-      : this.add.text(-84, 58, 'NEW BEST!', { ...textStyle, color: '#c1121f', strokeThickness: 0 }).setOrigin(0.5);
+      : this.add.text(-84, 58, 'Best!', { ...textStyle, color: '#c1121f', strokeThickness: 0 }).setOrigin(0.5);
     this.stamp.setAngle(-10).setAlpha(0);
 
     this.book = this.add.container(bookX, gameHeight + 160, [page, ...this.lines.map((line) => line.text), this.stamp]).setDepth(10);
