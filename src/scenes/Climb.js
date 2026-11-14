@@ -134,27 +134,48 @@ export default class Climb extends Phaser.Scene {
         .setDepth(1);
       fill.setMask(shape.createGeometryMask());
 
+      // the surface strip is drawn as long runs of one colour instead of one piece per segment, way cheaper to render
       const edge = this.add.graphics().setDepth(3);
+      let run = [];
+      let runColor = null;
+      const flush = () => {
+        if (run.length > 1) {
+          edge.lineStyle(14, runColor).strokePoints(run.map((p) => new Phaser.Math.Vector2(p.x, p.y + 5)));
+          edge.fillStyle(runColor).fillCircle(run[0].x, run[0].y + 5, 7).fillCircle(run[run.length - 1].x, run[run.length - 1].y + 5, 7);
+          edge.lineStyle(3, 0x000000, 0.15).strokePoints(run.map((p) => new Phaser.Math.Vector2(p.x, p.y + 12)));
+        }
+        run = [];
+        runColor = null;
+      };
       for (let i = 1; i < top.length; i++) {
         const a = top[i - 1];
         const b = top[i];
         // no grass strip down the face of a rock wall
-        if (Math.abs(b.y - a.y) > 30) continue;
+        if (Math.abs(b.y - a.y) > 30) {
+          flush();
+          continue;
+        }
         const color = surfaceColor((a.x + b.x) / 2);
-        edge.lineStyle(14, color).lineBetween(a.x, a.y + 5, b.x, b.y + 5);
-        edge.fillStyle(color).fillCircle(b.x, b.y + 5, 7);
-        edge.lineStyle(3, 0x000000, 0.15).lineBetween(a.x, a.y + 12, b.x, b.y + 12);
+        if (color !== runColor) {
+          flush();
+          run.push(a);
+          runColor = color;
+        }
+        run.push(b);
       }
+      flush();
 
       this.chunks.push({ from, to, parts: [fill, edge] });
     }
 
     for (const border of borders) this.makeSeam(border);
 
-    const patches = this.add.graphics().setDepth(3);
+    // everything below gets its own graphics and only draws while it's near the camera
     for (const patch of mountain.patches) {
-      if (patch.kind === 'ice') this.drawIce(patches, patch);
-      else this.drawScree(patches, patch);
+      const g = this.add.graphics().setDepth(3);
+      if (patch.kind === 'ice') this.drawIce(g, patch);
+      else this.drawScree(g, patch);
+      this.chunks.push({ from: patch.from - 20, to: patch.to + 20, parts: [g] });
     }
 
     for (const tree of mountain.trees) {
@@ -168,7 +189,7 @@ export default class Climb extends Phaser.Scene {
     const sink = { hut: 8, flowers: 5 };
     for (const item of mountain.decor) {
       if (item.kind === 'signpost') {
-        this.drawSign(item.x, mountain.lineAt(item.x) + 6);
+        this.chunks.push({ from: item.x - 20, to: item.x + 130, parts: this.drawSign(item.x, mountain.lineAt(item.x) + 6) });
         continue;
       }
       this.add.image(item.x, mountain.lineAt(item.x) + sink[item.kind], tex[item.kind])
@@ -176,7 +197,7 @@ export default class Climb extends Phaser.Scene {
         .setDepth(item.kind === 'flowers' ? 3.5 : 2);
     }
 
-    for (const wall of mountain.walls) this.drawWall(wall);
+    for (const wall of mountain.walls) this.chunks.push({ from: wall.x - 60, to: wall.x + 140, parts: [this.drawWall(wall)] });
 
     this.makeCable();
   }
@@ -205,8 +226,11 @@ export default class Climb extends Phaser.Scene {
     g.fillStyle(0xffffff).fillRect(x - 4, groundY - 13, 8, 3);
 
     const ink = { ...textStyle, fontSize: '8px', color: '#3d2b1f', strokeThickness: 0 };
-    this.add.text(x, groundY - 56, 'ZUGSPITZE', ink).setDepth(2.1);
-    this.add.text(x, groundY - 34, '2962 m', ink).setDepth(2.1);
+    return [
+      g,
+      this.add.text(x, groundY - 56, 'ZUGSPITZE', ink).setDepth(2.1),
+      this.add.text(x, groundY - 34, '2962 m', ink).setDepth(2.1),
+    ];
   }
 
   // lumpy stack of rock chunks, drawn on the solid side of the wall so it matches where you bump
@@ -284,6 +308,7 @@ export default class Climb extends Phaser.Scene {
     // grass or snow lip with a few bits hanging over
     g.fillStyle(surfaceColors[zones[zone].surface]).fillRect(wall.x - 5, top - 3, depth + 8, 8);
     for (let i = 0; i < 4; i++) g.fillRect(wall.x - 4 + i * 5, top + 4, 2, 2 + rand() * 5);
+    return g;
   }
 
   // hides the straight cut between two soil types behind a ragged pixel edge
@@ -343,12 +368,13 @@ export default class Climb extends Phaser.Scene {
     const last = pylons[pylons.length - 1] + 260;
     const route = [{ x: first, y: lineAt(first) }, ...tops, { x: last, y: lineAt(last) }];
 
-    const cable = this.add.graphics().setDepth(0.6);
-    for (const [side, sagSize] of [[-12, 50], [13, 60]]) {
-      cable.lineStyle(2, 0x2b2d42, 0.9);
-      for (let i = 1; i < route.length; i++) {
-        const a = route[i - 1];
-        const b = route[i];
+    // one graphics per span so only the spans on screen get drawn
+    for (let i = 1; i < route.length; i++) {
+      const a = route[i - 1];
+      const b = route[i];
+      const span = this.add.graphics().setDepth(0.6);
+      span.lineStyle(2, 0x2b2d42, 0.9);
+      for (const [side, sagSize] of [[-12, 50], [13, 60]]) {
         const ax = i === 1 ? a.x : a.x + side;
         const bx = i === route.length - 1 ? b.x : b.x + side;
         const sag = i === 1 || i === route.length - 1 ? 10 : sagSize;
@@ -356,8 +382,9 @@ export default class Climb extends Phaser.Scene {
         for (let t = 0; t <= 1.001; t += 0.05) {
           points.push(new Phaser.Math.Vector2(ax + (bx - ax) * t, a.y + (b.y - a.y) * t + Math.sin(t * Math.PI) * sag));
         }
-        cable.strokePoints(points);
+        span.strokePoints(points);
       }
+      this.chunks.push({ from: a.x - 20, to: b.x + 20, parts: [span] });
     }
   }
 
