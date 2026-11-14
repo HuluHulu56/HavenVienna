@@ -68,6 +68,14 @@ export function buildMountain() {
     return heights[i] + (heights[i + 1] - heights[i]) * t;
   };
 
+  // the drawn ground line skips the boulders so they look half buried
+  const line = heights.slice();
+  const lineAt = (x) => {
+    const i = Math.min(line.length - 2, Math.max(0, Math.floor(x / spacing)));
+    const t = Math.min(1, Math.max(0, x / spacing - i));
+    return line[i] + (line[i + 1] - line[i]) * t;
+  };
+
   // boulders are bumps in the ground, small enough to hop over
   const boulders = [];
   for (let x = 1400; x < summit.x - 800; x += between(350, 900)) {
@@ -86,8 +94,9 @@ export function buildMountain() {
   for (let x = 1600; x < summit.x - 400; x += between(500, 1100)) {
     const zone = zoneAt(progressAt(x));
     const r = random();
-    const kind = zone === 0 ? (r < 0.6 ? 'rock' : 'ice') : zone === 1 ? (r < 0.55 ? 'rock' : 'ice') : (r < 0.25 ? 'rock' : 'ice');
-    patches.push({ from: x, to: x + between(120, 320), kind });
+    const kind = zone === 0 ? (r < 0.7 ? 'rock' : 'ice') : zone === 1 ? (r < 0.5 ? 'rock' : 'ice') : (r < 0.25 ? 'rock' : 'ice');
+    const length = kind === 'ice' ? between(220, 480) : between(120, 300);
+    patches.push({ from: x, to: x + length, kind });
   }
 
   const surfaceAt = (x) => {
@@ -120,6 +129,6 @@ export function buildMountain() {
   return {
     heights, spacing, width, bottomY, summit,
     boulders, patches, enemies, pickups, trees,
-    heightAt, slopeAt, surfaceAt, progressAt,
+    heightAt, lineAt, slopeAt, surfaceAt, progressAt,
   };
 }

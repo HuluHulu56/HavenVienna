@@ -1,9 +1,12 @@
 import Phaser from 'phaser';
-import { world, gameWidth, gameHeight } from '../config.js';
+import { world, gameWidth, gameHeight, pogo, pickups } from '../config.js';
 import { tex, drawCross } from '../assets.js';
 import { buildMountain, zones, zoneAt } from '../level/mountain.js';
 import Player from '../objects/Player.js';
+import Enemy from '../objects/Enemy.js';
+import Pickup from '../objects/Pickup.js';
 import { sfx } from '../sfx.js';
+import { textStyle } from '../util.js';
 
 const lowSky = Phaser.Display.Color.ValueToColor(0x8ecae6);
 const highSky = Phaser.Display.Color.ValueToColor(0x274c77);
@@ -39,6 +42,8 @@ export default class Climb extends Phaser.Scene {
     // harder kick sends you further back down the slope
     const startX = mountain.summit.x * (1 - (0.35 + 0.6 * this.kick));
     this.player = new Player(this, mountain, startX, mountain.heightAt(startX) - 300);
+    this.makeCritters();
+    this.makeEffects();
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, mountain.width, world.height);
@@ -51,6 +56,7 @@ export default class Climb extends Phaser.Scene {
     this.keys.M.on('down', () => sfx.toggleMute());
     this.input.keyboard.on('keydown', () => sfx.unlock());
 
+    this.touch = { left: false, right: false, jump: false };
     this.run = { time: 0, stomps: 0, started: false, done: false, topZone: -1 };
     this.updateProgress();
 
@@ -84,9 +90,9 @@ export default class Climb extends Phaser.Scene {
   }
 
   surfacePoints(from, to) {
-    const { heightAt, spacing } = this.mountain;
+    const { lineAt, spacing } = this.mountain;
     const points = [];
-    for (let x = from; x <= to; x += spacing) points.push(new Phaser.Math.Vector2(x, heightAt(x)));
+    for (let x = from; x <= to; x += spacing) points.push(new Phaser.Math.Vector2(x, lineAt(x)));
     return points;
   }
 
@@ -119,24 +125,182 @@ export default class Climb extends Phaser.Scene {
 
     const patches = this.add.graphics().setDepth(3);
     for (const patch of mountain.patches) {
-      const points = this.surfacePoints(patch.from, patch.to);
-      patches.lineStyle(14, surfaceColors[patch.kind]);
-      patches.strokePoints(points.map((p) => new Phaser.Math.Vector2(p.x, p.y + 5)));
-      if (patch.kind === 'ice') {
-        patches.fillStyle(0xffffff, 0.8);
-        for (let i = 1; i < points.length; i += 3) patches.fillRect(points[i].x, points[i].y + 2, 6, 2);
-      } else {
-        patches.fillStyle(0x5e503f);
-        for (const p of points) patches.fillTriangle(p.x - 6, p.y + 2, p.x, p.y - 7, p.x + 6, p.y + 2);
-      }
+      if (patch.kind === 'ice') this.drawIce(patches, patch);
+      else this.drawScree(patches, patch);
     }
 
     for (const tree of mountain.trees) {
-      this.add.image(tree.x, mountain.heightAt(tree.x) + 6, tex.pine).setOrigin(0.5, 1).setScale(tree.size).setDepth(2);
+      this.add.image(tree.x, mountain.lineAt(tree.x) + 6, tex.pine).setOrigin(0.5, 1).setScale(tree.size).setDepth(2);
     }
 
     for (const boulder of mountain.boulders) {
-      this.add.image(boulder.x, boulder.y, tex.boulder).setDisplaySize(boulder.r * 2, boulder.r * 2).setDepth(4);
+      this.add.image(boulder.x, boulder.y, tex.boulder).setDisplaySize(boulder.r * 2, boulder.r * 2).setDepth(0);
+    }
+  }
+
+  makeCritters() {
+    this.enemies = this.mountain.enemies.map((data) => new Enemy(this, this.mountain, data));
+    this.pickups = this.mountain.pickups.map((data) => new Pickup(this, this.mountain, data));
+    this.snowballs = [];
+  }
+
+  makeEffects() {
+    this.dust = this.add.particles(0, 0, tex.dot, {
+      speed: { min: 30, max: 110 },
+      angle: { min: 200, max: 340 },
+      gravityY: 300,
+      lifespan: 450,
+      scale: { start: 0.9, end: 0 },
+      emitting: false,
+    }).setDepth(9);
+
+    this.sparkle = this.add.particles(0, 0, tex.dot, {
+      speed: { min: 20, max: 60 },
+      lifespan: 500,
+      scale: { start: 0.8, end: 0 },
+      tint: [0xffd60a, 0xffffff],
+      frequency: 40,
+      emitting: false,
+    }).setDepth(9);
+    this.sparkle.startFollow(this.player.sprite, 0, -24);
+
+    this.events.on('slip', () => {
+      sfx.slip();
+      this.puff(this.player.x, this.player.y, 0xcaf0f8, 10);
+    });
+  }
+
+  puff(x, y, color, count = 6) {
+    this.dust.setParticleTint(color);
+    this.dust.explode(count, x, y);
+  }
+
+  floatText(x, y, text, color = '#ffffff') {
+    const label = this.add.text(x, y, text, { ...textStyle, fontSize: '16px', color }).setOrigin(0.5).setDepth(25);
+    this.tweens.add({ targets: label, y: y - 40, alpha: 0, duration: 900, onComplete: () => label.destroy() });
+  }
+
+  throwSnowball(tourist) {
+    const player = this.player;
+    const fromY = tourist.y - 30;
+    const dx = player.x - tourist.x;
+    const dy = player.y - 22 - fromY;
+    const time = Phaser.Math.Clamp(Math.abs(dx) / 260, 0.5, 1.4);
+    const sprite = this.add.image(tourist.x, fromY, tex.snowball).setDepth(9);
+    this.snowballs.push({ sprite, x: tourist.x, y: fromY, vx: dx / time, vy: (dy - 300 * time * time) / time, age: 0 });
+    sfx.throwBall();
+  }
+
+  stomp(enemy) {
+    enemy.squash();
+    this.player.stomp();
+    this.run.stomps += 1;
+    sfx.stomp();
+    this.puff(enemy.x, enemy.y - 10, 0xffffff, 14);
+    this.floatText(enemy.x, enemy.y - 40, '+SPRING', '#80ed99');
+  }
+
+  grab(pickup) {
+    const player = this.player;
+    pickup.take();
+    if (pickup.kind === 'pretzel') {
+      player.supercharge();
+      sfx.power();
+      this.message('SUPERCHARGED!', '#ffd60a');
+    } else {
+      player.addSpring(pickups[pickup.kind].spring);
+      sfx.pickup();
+      this.floatText(pickup.x, pickup.y - 20, pickup.kind === 'golden' ? 'FULL SPRING!' : '+SPRING', '#ffd60a');
+    }
+  }
+
+  updateCritters(dt) {
+    const player = this.player;
+    const me = player.bounds;
+    const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+
+    for (const enemy of this.enemies) {
+      enemy.update(dt, player);
+      if (enemy.dead || player.mode === 'done' || !overlaps(me, enemy.bounds)) continue;
+      if (player.mode === 'air' && player.vy > 0 && player.y < enemy.bounds.top + 16) this.stomp(enemy);
+      else if (player.hurt(enemy.x, enemy.kind === 'yeti' ? pogo.yetiDrain : pogo.hitDrain)) this.floatText(player.x, player.y - 60, '-SPRING', '#ef476f');
+    }
+
+    for (const pickup of this.pickups) {
+      if (!pickup.taken && player.mode !== 'done' && pickup.touches(player)) this.grab(pickup);
+    }
+
+    for (const ball of this.snowballs) {
+      ball.age += dt;
+      ball.vy += 600 * dt;
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+      ball.sprite.setPosition(ball.x, ball.y);
+
+      const hitPlayer = Math.abs(ball.x - player.x) < 12 && ball.y > me.top && ball.y < me.bottom;
+      if (hitPlayer && player.hurt(ball.x, pogo.snowballDrain)) this.floatText(player.x, player.y - 60, 'SPLAT!', '#caf0f8');
+      if (hitPlayer || ball.age > 3 || ball.y > this.mountain.heightAt(ball.x)) {
+        this.puff(ball.x, ball.y, 0xffffff, 6);
+        ball.sprite.destroy();
+        ball.done = true;
+      }
+    }
+    this.snowballs = this.snowballs.filter((ball) => !ball.done);
+
+    if (player.supercharged !== this.sparkle.emitting) {
+      if (player.supercharged) this.sparkle.start();
+      else this.sparkle.stop();
+    }
+  }
+
+  // thickness that fades out at both ends so patches melt into the ground
+  taper(points, thickness) {
+    return points.map((p, i) => thickness * Math.sqrt(Math.sin((i / (points.length - 1)) * Math.PI)));
+  }
+
+  sheet(g, points, depths, offset = 0) {
+    const top = points.map((p) => new Phaser.Math.Vector2(p.x, p.y + offset));
+    const bottom = points.map((p, i) => new Phaser.Math.Vector2(p.x, p.y + offset + depths[i])).reverse();
+    g.fillPoints([...top, ...bottom], true);
+  }
+
+  drawIce(g, patch) {
+    const points = this.surfacePoints(patch.from, patch.to);
+    const depths = this.taper(points, 20);
+
+    g.fillStyle(0x5fa8d3, 0.55);
+    this.sheet(g, points, depths.map((d) => d + 4), -2);
+    g.fillStyle(0xbde6f5, 0.95);
+    this.sheet(g, points, depths, -3);
+    g.fillStyle(0xf1fbff, 0.9);
+    this.sheet(g, points, this.taper(points, 4), -3);
+
+    // shine streaks
+    g.fillStyle(0xffffff, 0.9);
+    for (let i = 2; i < points.length - 2; i += 4) {
+      const p = points[i];
+      const d = depths[i];
+      if (d < 8) continue;
+      g.fillRect(p.x - 4, p.y + d * 0.35, 8, 2);
+      g.fillRect(p.x + 2, p.y + d * 0.35 + 3, 4, 2);
+    }
+  }
+
+  drawScree(g, patch) {
+    const points = this.surfacePoints(patch.from, patch.to);
+    const depths = this.taper(points, 12);
+
+    g.fillStyle(0x6b5a48, 0.9);
+    this.sheet(g, points, depths, -1);
+    for (let i = 1; i < points.length - 1; i++) {
+      const p = points[i];
+      const size = depths[i] * 0.7;
+      if (size < 3) continue;
+      const shift = ((i * 7) % 5) - 2;
+      g.fillStyle(i % 2 ? 0x8a7560 : 0xa39171);
+      g.fillTriangle(p.x + shift - size, p.y + 3, p.x + shift, p.y - size, p.x + shift + size * 0.8, p.y + 3);
+      g.fillStyle(0x4a3f35);
+      g.fillRect(p.x + shift - 1, p.y + 1, 3, 2);
     }
   }
 
@@ -157,6 +321,16 @@ export default class Climb extends Phaser.Scene {
     if (surface === 'summit') {
       this.finish();
       return;
+    }
+
+    if (surface === 'rock' && !player.supercharged) {
+      player.addSpring(-pogo.rockDrain);
+      sfx.rock();
+      this.cameras.main.shake(120, 0.004);
+      this.puff(player.x, player.y, 0x8a7560, 10);
+      this.floatText(player.x, player.y - 60, 'OUCH -SPRING', '#ef476f');
+    } else {
+      this.puff(player.x, player.y, surfaceColors[surface] ?? 0xffffff);
     }
     player.land(surface);
   }
@@ -214,11 +388,13 @@ export default class Climb extends Phaser.Scene {
     const dt = Math.min(delta, 50) / 1000;
     const k = this.keys;
     const controls = this.player.controls;
-    controls.left = k.LEFT.isDown || k.A.isDown;
-    controls.right = k.RIGHT.isDown || k.D.isDown;
-    controls.jump = k.SPACE.isDown || k.UP.isDown || k.W.isDown;
+    controls.left = k.LEFT.isDown || k.A.isDown || this.touch.left;
+    controls.right = k.RIGHT.isDown || k.D.isDown || this.touch.right;
+    controls.jump = k.SPACE.isDown || k.UP.isDown || k.W.isDown || this.touch.jump;
 
     this.player.update(dt);
+    this.updateCritters(dt);
+    if (this.player.mode === 'skid') this.puff(this.player.x, this.player.y, 0xe0f7ff, 1);
     if (this.run.started && !this.run.done) this.run.time += dt;
 
     this.updateProgress();

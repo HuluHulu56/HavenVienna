@@ -38,7 +38,12 @@ export default class Player {
   land(surface) {
     this.onIce = surface === 'ice';
     this.squash = 0.7;
-    if (this.controls.jump) {
+    if (this.onIce) {
+      this.mode = 'skid';
+      this.skidLeft = pogo.iceSkid;
+      this.vx *= 0.9;
+      this.scene.events.emit('slip');
+    } else if (this.controls.jump) {
       this.mode = 'crouch';
       this.charge = 0;
       if (!this.onIce) this.vx = 0;
@@ -49,13 +54,14 @@ export default class Player {
 
   bounce(charge = 0, bonus = 0, free = false) {
     const power = this.supercharged ? 1 : this.spring;
-    const height = (pogo.minBounce + (pogo.maxBounce - pogo.minBounce) * power) * (1 + pogo.superBonus * charge) + bonus;
+    let height = (pogo.minBounce + (pogo.maxBounce - pogo.minBounce) * power) * (1 + pogo.superBonus * charge) + bonus;
     const slope = this.mountain.slopeAt(this.x);
 
     let vx = this.tilt * pogo.launchSpeed + slope * pogo.slopePush;
     if (this.onIce && !free) {
-      vx += this.vx * 0.6 + slope * 250 + Phaser.Math.Between(-90, 90);
-      this.scene.events.emit('slip');
+      // no grip, so a weaker and wonkier bounce
+      height = Math.max(pogo.minBounce, height * pogo.iceGrip);
+      vx = vx * 0.5 + this.vx * 0.7 + slope * 250 + Phaser.Math.Between(-120, 120);
     }
 
     this.vx = Phaser.Math.Clamp(vx, -pogo.airSpeed, pogo.airSpeed);
@@ -128,6 +134,21 @@ export default class Player {
       }
       this.y = mountain.heightAt(this.x);
       if (!jump) this.bounce(this.charge);
+    } else if (this.mode === 'skid') {
+      this.vx += mountain.slopeAt(this.x) * pogo.iceSlide * dt;
+      this.x += this.vx * dt;
+      this.keepInWorld();
+      this.y = mountain.heightAt(this.x);
+      this.skidLeft -= dt;
+      if (this.skidLeft <= 0 || mountain.surfaceAt(this.x) !== 'ice') {
+        this.onIce = mountain.surfaceAt(this.x) === 'ice';
+        if (jump) {
+          this.mode = 'crouch';
+          this.charge = 0;
+        } else {
+          this.bounce();
+        }
+      }
     } else {
       this.y = mountain.heightAt(this.x);
     }
@@ -152,6 +173,7 @@ export default class Player {
     this.sprite.setPosition(this.x, this.y);
     this.sprite.setScale(1 + (1 - this.squash) * 0.6, this.squash);
     this.sprite.rotation = this.tilt * 0.45;
+    if (this.mode === 'skid') this.sprite.rotation += Math.sin(this.scene.time.now / 25) * 0.2;
     this.sprite.setAlpha(this.hurtLeft > 0 && Math.floor(this.hurtLeft * 20) % 2 ? 0.35 : 1);
 
     if (this.supercharged) this.sprite.setTint(Math.floor(this.superLeft * 10) % 2 ? 0xffe066 : 0xffffff);

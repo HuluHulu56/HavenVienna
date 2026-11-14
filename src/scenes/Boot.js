@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { makeTextures } from '../assets.js';
+import { sfx } from '../sfx.js';
 
 export default class Boot extends Phaser.Scene {
   constructor() {
@@ -25,10 +26,16 @@ export default class Boot extends Phaser.Scene {
     this.load.image('groundGlacier', 'assets/groundGlacier.png');
     this.load.image('pine', 'assets/pine.png');
     this.load.image('boulder', 'assets/boulder.png');
+
+    for (const name of ['boing', 'stomp', 'pickup', 'power', 'hit', 'rock', 'slip', 'kick', 'clink', 'fanfare', 'music']) {
+      this.load.audio(name, `assets/sounds/${name}.ogg`);
+    }
   }
 
   create() {
     makeTextures(this);
+    sfx.use(this.sound);
+    sfx.music();
     const kick = new URLSearchParams(location.search).get('kick');
     if (kick === null) {
       this.scene.start('Intro');
