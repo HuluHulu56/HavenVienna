@@ -30,3 +30,10 @@ clink sound - made by us
 fanfare sound - made by us
 music - made by us
 Press Start 2P - by the Press Start 2P Project Authors (SIL OFL 1.1) - https://fonts.google.com/specimen/Press+Start+2P
+dust - made by us
+sparkle - made by us
+splat - made by us
+signpost - made by us
+hut - made by us
+flowers - made by us
+cablePylon - made by us

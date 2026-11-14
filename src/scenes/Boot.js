@@ -26,6 +26,13 @@ export default class Boot extends Phaser.Scene {
     this.load.image('groundGlacier', 'assets/groundGlacier.png');
     this.load.image('pine', 'assets/pine.png');
     this.load.image('boulder', 'assets/boulder.png');
+    this.load.image('dust', 'assets/dust.png');
+    this.load.image('sparkle', 'assets/sparkle.png');
+    this.load.image('splat', 'assets/splat.png');
+    this.load.image('signpost', 'assets/signpost.png');
+    this.load.image('hut', 'assets/hut.png');
+    this.load.image('flowers', 'assets/flowers.png');
+    this.load.image('cablePylon', 'assets/cablePylon.png');
 
     for (const name of ['boing', 'stomp', 'pickup', 'power', 'hit', 'rock', 'slip', 'kick', 'clink', 'fanfare', 'music']) {
       this.load.audio(name, `assets/sounds/${name}.ogg`);
