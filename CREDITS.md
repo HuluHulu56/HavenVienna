@@ -38,3 +38,8 @@ hut - made by us
 flowers - made by us
 cablePylon - made by us
 itch cover, banner and icon - made by us
+yetiCheers - made by us
+playerCheers - made by us
+logbook - made by us
+stampBest - made by us
+banner - made by us
