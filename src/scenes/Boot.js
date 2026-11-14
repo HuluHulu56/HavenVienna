@@ -7,7 +7,12 @@ export default class Boot extends Phaser.Scene {
   }
 
   preload() {
-    // real sprites go here, e.g. this.load.image('player', 'assets/player.png')
+    this.load.image('player', 'assets/player.png');
+    this.load.image('yeti', 'assets/yeti.png');
+    this.load.image('yetiBig', 'assets/yetiBig.png');
+    this.load.image('fox', 'assets/fox.png');
+    this.load.image('tourist', 'assets/tourist.png');
+    this.load.image('snowball', 'assets/snowball.png');
   }
 
   create() {
