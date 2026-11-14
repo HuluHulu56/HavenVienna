@@ -40,6 +40,34 @@ export const pogo = {
   hurtTime: 1,
 };
 
+// how much each setback fills the grit meter
+export const grit = {
+  yeti: 0.25,
+  hit: 0.18,
+  snowball: 0.12,
+  roller: 0.2,
+  rock: 0.08,
+  bonk: 0.06,
+  slip: 0.05,
+  lostGround: 0.12,
+};
+
+export const mega = {
+  height: 480,
+  speed: 420,
+  flight: 1.6,
+  spring: 0.3,
+};
+
+export const rollers = {
+  minWait: 5,
+  maxWait: 9,
+  minSpeed: 170,
+  maxSpeed: 240,
+  radius: 28,
+  drain: 0.1,
+};
+
 export const pickups = {
   golden: { spring: 1, respawn: 45000 },
   coil: { spring: 0.15, respawn: 25000 },

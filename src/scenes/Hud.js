@@ -12,6 +12,7 @@ const altY = 120;
 const altHeight = 330;
 const superWidth = 200;
 const touchRadius = 56;
+const gritX = meterX + 36;
 
 export default class Hud extends Phaser.Scene {
   constructor() {
@@ -36,7 +37,18 @@ export default class Hud extends Phaser.Scene {
     this.muteText = this.add.text(944, 16, 'MUTED', { ...textStyle, color: '#ef476f' }).setOrigin(1, 0).setVisible(false);
 
     const touch = this.sys.game.device.input.touch;
-    const hintText = touch ? 'hold JUMP for a super bounce' : 'LEFT/RIGHT tilt   hold SPACE for a super bounce\nP pause   M mute';
+    this.add.text(gritX + 6, meterY - 22, 'GRIT', { ...textStyle, fontSize: '8px', strokeThickness: 3, color: '#f8961e' }).setOrigin(0.5);
+    this.gritKey = this.add.text(gritX + 6, meterY + meterHeight + 14, touch ? 'TAP' : 'E', { ...textStyle, fontSize: '10px', color: '#ffd60a' })
+      .setOrigin(0.5)
+      .setVisible(false);
+    this.gritFlash = 0;
+    const onGrit = () => { this.gritFlash = 1; };
+    this.climb.events.on('grit', onGrit);
+    this.events.once('shutdown', () => this.climb.events.off('grit', onGrit));
+
+    const hintText = touch
+      ? 'hold JUMP for a super bounce'
+      : 'LEFT/RIGHT tilt   hold SPACE for a super bounce\nE mega bounce when GRIT is full   P pause   M mute';
     const hint = this.add.text(480, touch ? 300 : 504, hintText, {
       ...textStyle,
       align: 'center',
@@ -98,6 +110,11 @@ export default class Hud extends Phaser.Scene {
     this.touchButton(210, 470, 'right', (icon) => icon.fillTriangle(-14, -20, -14, 20, 18, 0));
     this.touchButton(850, 470, 'jump', (icon) => icon.fillTriangle(-20, 4, 20, 4, 0, -26));
     this.add.text(850, 490, 'JUMP', textStyle).setOrigin(0.5).setAlpha(0.8);
+
+    // one tap mega bounce, only lights up once grit is full
+    this.megaButton = this.add.circle(850, 350, 44, 0xf8961e, 0.15).setStrokeStyle(4, 0x1b263b, 0.5).setInteractive();
+    this.megaLabel = this.add.text(850, 350, 'GRIT', textStyle).setOrigin(0.5).setAlpha(0.5);
+    this.megaButton.on('pointerdown', () => this.climb.megaBounce());
   }
 
   touchButton(x, y, key, drawIcon) {
@@ -153,6 +170,21 @@ export default class Hud extends Phaser.Scene {
     g.fillStyle(0x1b263b, 0.7).fillRect(meterX - 4, meterY - 4, 30, meterHeight + 8);
     g.fillStyle(color, fillAlpha).fillRect(meterX, meterY + meterHeight * (1 - spring), 22, meterHeight * spring);
     this.coilIcon.setAngle(low ? Math.sin(time / 180) * 10 : 0);
+
+    // grit bar, flashes when it fills up a bit and glows once it's full
+    const gritLevel = climb.run.grit;
+    const full = gritLevel >= 1;
+    this.gritFlash = Math.max(0, this.gritFlash - 0.05);
+    const frame = this.gritFlash > 0 ? 0xffffff : full ? 0xffd60a : 0x1b263b;
+    g.fillStyle(frame, this.gritFlash > 0 || full ? 0.9 : 0.7).fillRect(gritX - 4, meterY - 4, 20, meterHeight + 8);
+    g.fillStyle(0x1b263b, 1).fillRect(gritX, meterY, 12, meterHeight);
+    const gritColor = full ? (Math.floor(time / 150) % 2 ? 0xffd60a : 0xfff3b0) : 0xf8961e;
+    g.fillStyle(gritColor, 1).fillRect(gritX, meterY + meterHeight * (1 - gritLevel), 12, meterHeight * gritLevel);
+    this.gritKey.setVisible(full).setScale(full ? 1 + Math.sin(time / 120) * 0.15 : 1);
+    if (this.megaButton) {
+      this.megaButton.setFillStyle(full ? 0xffd60a : 0xf8961e, full ? 0.6 : 0.15);
+      this.megaLabel.setAlpha(full ? 1 : 0.5);
+    }
 
     const superLeft = Math.max(0, player.superLeft);
     this.superIcon.setVisible(superLeft > 0);

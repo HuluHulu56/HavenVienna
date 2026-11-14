@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { pogo, gravity, maxFall } from '../config.js';
+import { pogo, gravity, maxFall, mega } from '../config.js';
 import { tex } from '../assets.js';
 import { sfx } from '../sfx.js';
 
@@ -20,6 +20,7 @@ export default class Player {
     this.charge = 0;
     this.superLeft = 0;
     this.hurtLeft = 0;
+    this.megaLeft = 0;
     this.squash = 1;
     this.onIce = false;
     this.controls = { left: false, right: false, jump: false };
@@ -36,6 +37,7 @@ export default class Player {
   }
 
   land(surface) {
+    this.megaLeft = 0;
     this.onIce = surface === 'ice';
     this.squash = 0.7;
     if (this.onIce) {
@@ -82,8 +84,20 @@ export default class Player {
     this.bounce(0, pogo.stompBonus, true);
   }
 
+  // all the grit you built up turns into one huge launch up the slope
+  mega() {
+    this.mode = 'air';
+    this.charge = 0;
+    this.onIce = false;
+    this.megaLeft = mega.flight;
+    this.vx = mega.speed;
+    this.vy = -Math.sqrt(2 * gravity * mega.height);
+    this.addSpring(mega.spring);
+    this.squash = 1.5;
+  }
+
   hurt(fromX, drain) {
-    if (this.hurtLeft > 0 || this.mode === 'done') return false;
+    if (this.hurtLeft > 0 || this.megaLeft > 0 || this.mode === 'done') return false;
     this.addSpring(-drain);
     this.hurtLeft = pogo.hurtTime;
     this.mode = 'air';
@@ -113,7 +127,8 @@ export default class Player {
     else this.tilt -= Math.sign(this.tilt) * Math.min(Math.abs(this.tilt), pogo.tiltBack * dt);
 
     if (this.mode === 'air') {
-      if (dir) this.vx = Phaser.Math.Clamp(this.vx + dir * pogo.airAccel * dt, -pogo.airSpeed, pogo.airSpeed);
+      if (this.megaLeft > 0) this.megaLeft -= dt;
+      else if (dir) this.vx = Phaser.Math.Clamp(this.vx + dir * pogo.airAccel * dt, -pogo.airSpeed, pogo.airSpeed);
       else this.vx *= 1 - pogo.airDrag * dt;
       this.vy = Math.min(maxFall, this.vy + gravity * dt);
 
@@ -191,6 +206,8 @@ export default class Player {
     this.sprite.setScale(1 + (1 - this.squash) * 0.6, this.squash);
     this.sprite.rotation = this.tilt * 0.45;
     if (this.mode === 'skid') this.sprite.rotation += Math.sin(this.scene.time.now / 25) * 0.2;
+    // one big front flip during a mega bounce
+    if (this.megaLeft > 0) this.sprite.rotation += (1 - this.megaLeft / mega.flight) * Math.PI * 2;
     this.sprite.setAlpha(this.hurtLeft > 0 && Math.floor(this.hurtLeft * 20) % 2 ? 0.35 : 1);
 
     if (this.supercharged) this.sprite.setTint(Math.floor(this.superLeft * 10) % 2 ? 0xffe066 : 0xffffff);

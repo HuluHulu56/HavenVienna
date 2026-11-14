@@ -1,3 +1,5 @@
+import { rollers } from './config.js';
+
 export const tex = {
   player: 'player',
   yeti: 'yeti',
@@ -23,16 +25,40 @@ export const tex = {
   groundMeadow: 'groundMeadow',
   groundCliffs: 'groundCliffs',
   groundGlacier: 'groundGlacier',
+  bigSnowball: 'bigSnowball',
 };
 
-// everything else comes from public/assets, this is just the plain white particle
+// everything else comes from public/assets, these two are simple enough to draw here
 export function makeTextures(scene) {
-  if (scene.textures.exists(tex.dot)) return;
-  const canvas = scene.textures.createCanvas(tex.dot, 4, 4);
-  const ctx = canvas.getContext();
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, 4, 4);
-  canvas.refresh();
+  if (!scene.textures.exists(tex.dot)) {
+    const canvas = scene.textures.createCanvas(tex.dot, 4, 4);
+    const ctx = canvas.getContext();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, 4, 4);
+    canvas.refresh();
+  }
+
+  // rolling snowball on the same 2x pixel grid as the sprites, lit from the top left
+  if (!scene.textures.exists(tex.bigSnowball)) {
+    // 2px per cell, so the sprite ends up exactly as wide as the snowball
+    const cells = rollers.radius;
+    const canvas = scene.textures.createCanvas(tex.bigSnowball, cells * 2, cells * 2);
+    const ctx = canvas.getContext();
+    const mid = (cells - 1) / 2;
+    for (let y = 0; y < cells; y++) {
+      for (let x = 0; x < cells; x++) {
+        const dist = Math.hypot(x - mid, y - mid);
+        if (dist > mid + 0.5) continue;
+        const light = (-(x - mid) - (y - mid)) / (mid * 1.4);
+        let color = light > 0.35 ? '#ffffff' : light > -0.25 ? '#e3eef8' : '#b4c8dd';
+        if (dist > mid - 0.6) color = '#2b3a55';
+        else if ((x * 7 + y * 13) % 17 === 0) color = '#c6d8ea';
+        ctx.fillStyle = color;
+        ctx.fillRect(x * 2, y * 2, 2, 2);
+      }
+    }
+    canvas.refresh();
+  }
 }
 
 export function drawCross(scene, x, groundY, size = 1) {

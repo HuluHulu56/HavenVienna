@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { world, gameWidth, gameHeight, pogo, pickups } from '../config.js';
+import { world, gameWidth, gameHeight, pogo, pickups, grit, rollers } from '../config.js';
 import { tex, drawCross } from '../assets.js';
 import { buildMountain, zones, zoneAt } from '../level/mountain.js';
 import Player from '../objects/Player.js';
@@ -52,12 +52,16 @@ export default class Climb extends Phaser.Scene {
     cam.setDeadzone(60, 60);
     cam.centerOn(startX + 180, this.player.y);
 
-    this.keys = this.input.keyboard.addKeys('LEFT,RIGHT,UP,A,D,W,SPACE,M');
+    this.keys = this.input.keyboard.addKeys('LEFT,RIGHT,UP,A,D,W,SPACE,M,E');
     this.keys.M.on('down', () => sfx.toggleMute());
+    this.keys.E.on('down', () => this.megaBounce());
     this.input.keyboard.on('keydown', () => sfx.unlock());
 
     this.touch = { left: false, right: false, jump: false };
-    this.run = { time: 0, stomps: 0, started: false, done: false, topZone: -1 };
+    this.run = { time: 0, stomps: 0, started: false, done: false, topZone: -1, grit: 0, furthest: startX };
+    this.slowLeft = 0;
+    this.rollers = [];
+    this.rollWait = rollers.maxWait;
     this.updateProgress();
 
     this.scene.launch('Hud');
@@ -421,6 +425,7 @@ export default class Climb extends Phaser.Scene {
     this.events.on('slip', () => {
       sfx.slip();
       this.puff(this.player.x, this.player.y, 0xcaf0f8, 10);
+      this.addGrit(grit.slip);
     });
     let nextBonk = 0;
     const bonk = () => {
@@ -428,9 +433,119 @@ export default class Climb extends Phaser.Scene {
       nextBonk = this.time.now + 400;
       sfx.rock();
       this.puff(this.player.x, this.player.y - 20, 0x8d99ae, 6);
+      this.addGrit(grit.bonk);
     };
     this.events.on('bonk', bonk);
     this.events.once('shutdown', () => this.events.off('bonk', bonk));
+  }
+
+  // every setback builds grit, that's the whole bouncing back idea
+  addGrit(amount) {
+    if (this.run.done || this.player.megaLeft > 0) return;
+    const before = this.run.grit;
+    this.run.grit = Math.min(1, before + amount);
+    this.events.emit('grit', this.run.grit - before);
+    if (before < 1 && this.run.grit >= 1) {
+      sfx.power();
+      const touch = this.sys.game.device.input.touch;
+      this.message(touch ? 'GRIT FULL! TAP GRIT' : 'GRIT FULL! PRESS E', '#f8961e');
+    }
+  }
+
+  megaBounce() {
+    const player = this.player;
+    if (this.run.grit < 1 || !this.run.started || this.run.done || player.mode === 'done') return;
+    this.run.grit = 0;
+    player.mega();
+    this.slowLeft = 0.35;
+
+    sfx.power();
+    sfx.kick();
+    this.cameras.main.flash(160, 255, 214, 10);
+    this.cameras.main.shake(300, 0.012);
+    this.message('MEGA BOUNCE!', '#ffd60a');
+    this.puff(player.x, player.y, 0xffd60a, 24);
+    for (const [delay, size] of [[0, 140], [90, 210]]) {
+      const ring = this.add.circle(player.x, player.y - 10, 16).setStrokeStyle(6, 0xffd60a).setDepth(9);
+      this.tweens.add({ targets: ring, radius: size, alpha: 0, duration: 420, delay, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    }
+  }
+
+  // big snowballs that come rolling down the slope at you
+  spawnRoller() {
+    const cam = this.cameras.main;
+    const { heightAt, summit } = this.mountain;
+    const x = cam.scrollX + gameWidth + 160;
+    if (x > summit.x - 300 || this.rollers.length >= 2) return;
+
+    const r = rollers.radius;
+    const sprite = this.add.image(x, heightAt(x) - r, tex.bigSnowball).setDepth(8);
+    this.rollers.push({ sprite, x, y: heightAt(x) - r, vy: 0, speed: Phaser.Math.Between(rollers.minSpeed, rollers.maxSpeed) });
+
+    // warning at the edge of the screen
+    sfx.rock();
+    // sits left of the altitude bar so it doesnt get hidden behind it
+    const warnY = Phaser.Math.Clamp(heightAt(cam.scrollX + gameWidth - 90) - r - cam.scrollY, 70, gameHeight - 70);
+    const warn = this.add.text(gameWidth - 90, warnY, '!', { ...textStyle, fontSize: '28px', color: '#ef476f' })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(25);
+    this.tweens.add({ targets: warn, alpha: 0, duration: 180, yoyo: true, repeat: 2, onComplete: () => warn.destroy() });
+  }
+
+  updateRollers(dt) {
+    const player = this.player;
+    const { heightAt, slopeAt } = this.mountain;
+    const r = rollers.radius;
+    const left = this.cameras.main.scrollX - 400;
+
+    if (this.run.started && !this.run.done) {
+      this.rollWait -= dt;
+      if (this.rollWait <= 0) {
+        this.spawnRoller();
+        this.rollWait = Phaser.Math.FloatBetween(rollers.minWait, rollers.maxWait);
+      }
+    }
+
+    for (const ball of this.rollers) {
+      // picks up speed going downhill, drops off rock walls
+      ball.speed = Phaser.Math.Clamp(ball.speed - Phaser.Math.Clamp(slopeAt(ball.x), -1, 1) * 200 * dt, 120, 360);
+      ball.x -= ball.speed * dt;
+      const ground = heightAt(ball.x) - r;
+      // follows the slope while rolling, only really falls when it goes off a wall
+      const rolling = ball.vy === 0 && ground - ball.y < ball.speed * dt * 1.5 + 2;
+      if (!rolling && ball.y < ground - 1) {
+        ball.vy += 1400 * dt;
+        ball.y = Math.min(ground, ball.y + ball.vy * dt);
+        if (ball.y >= ground) ball.vy = 0;
+      } else {
+        ball.y = ground;
+        ball.vy = 0;
+      }
+      ball.sprite.setPosition(ball.x, ball.y).setRotation(ball.sprite.rotation - (ball.speed * dt) / r);
+      if (Math.random() < 0.3) this.puff(ball.x + r * 0.6, ball.y + r, 0xffffff, 1);
+
+      const dx = player.x - ball.x;
+      const dy = player.y - 20 - ball.y;
+      if (player.mode !== 'done' && Math.hypot(dx, dy) < r + 12) {
+        if (player.mode === 'air' && player.vy > 0 && player.y < ball.y - r * 0.4) {
+          // landed on top of it
+          player.bounce(0, 40, true);
+          sfx.stomp();
+          this.puff(ball.x, ball.y - r, 0xffffff, 8);
+        } else if (player.hurt(ball.x, rollers.drain)) {
+          this.floatText(player.x, player.y - 60, 'SPLAT!', '#caf0f8');
+          this.cameras.main.shake(160, 0.006);
+          this.addGrit(grit.roller);
+          this.splat(ball.x, ball.y + r);
+          this.puff(ball.x, ball.y, 0xffffff, 16);
+          ball.done = true;
+        }
+      }
+      if (ball.x < left || ball.x < 0) ball.done = true;
+      if (ball.done) ball.sprite.destroy();
+    }
+    this.rollers = this.rollers.filter((ball) => !ball.done);
   }
 
   // first time you reach a wall without enough spring, tell them about charging
@@ -515,6 +630,7 @@ export default class Climb extends Phaser.Scene {
         this.stomp(enemy);
       } else if (player.hurt(enemy.x, enemy.kind === 'yeti' ? pogo.yetiDrain : pogo.hitDrain)) {
         this.floatText(player.x, player.y - 60, bites ? 'BITE!' : '-SPRING', '#ef476f');
+        this.addGrit(enemy.kind === 'yeti' ? grit.yeti : grit.hit);
       }
     }
 
@@ -530,7 +646,10 @@ export default class Climb extends Phaser.Scene {
       ball.sprite.setPosition(ball.x, ball.y);
 
       const hitPlayer = Math.abs(ball.x - player.x) < 12 && ball.y > me.top && ball.y < me.bottom;
-      if (hitPlayer && player.hurt(ball.x, pogo.snowballDrain)) this.floatText(player.x, player.y - 60, 'SPLAT!', '#caf0f8');
+      if (hitPlayer && player.hurt(ball.x, pogo.snowballDrain)) {
+        this.floatText(player.x, player.y - 60, 'SPLAT!', '#caf0f8');
+        this.addGrit(grit.snowball);
+      }
       if (hitPlayer || ball.age > 3 || ball.y > this.mountain.heightAt(ball.x)) {
         this.splat(ball.x, Math.min(ball.y, this.mountain.heightAt(ball.x)));
         ball.sprite.destroy();
@@ -539,8 +658,9 @@ export default class Climb extends Phaser.Scene {
     }
     this.snowballs = this.snowballs.filter((ball) => !ball.done);
 
-    if (player.supercharged !== this.sparkle.emitting) {
-      if (player.supercharged) this.sparkle.start();
+    const shiny = player.supercharged || player.megaLeft > 0;
+    if (shiny !== this.sparkle.emitting) {
+      if (shiny) this.sparkle.start();
       else this.sparkle.stop();
     }
   }
@@ -621,6 +741,7 @@ export default class Climb extends Phaser.Scene {
       this.cameras.main.shake(120, 0.004);
       this.puff(player.x, player.y, 0x8a7560, 10);
       this.floatText(player.x, player.y - 60, 'OUCH -SPRING', '#ef476f');
+      this.addGrit(grit.rock);
     } else {
       this.puff(player.x, player.y, surfaceColors[surface] ?? 0xffffff);
     }
@@ -676,8 +797,25 @@ export default class Climb extends Phaser.Scene {
     }
   }
 
+  // getting knocked a good way back down the slope counts as a setback too
+  checkLostGround() {
+    const run = this.run;
+    const x = this.player.x;
+    if (x > run.furthest) run.furthest = x;
+    if (run.started && run.furthest - x > 160) {
+      run.furthest = x;
+      this.addGrit(grit.lostGround);
+    }
+  }
+
   update(time, delta) {
-    const dt = Math.min(delta, 50) / 1000;
+    let dt = Math.min(delta, 50) / 1000;
+    // short slow motion right as a mega bounce kicks off
+    if (this.slowLeft > 0) {
+      this.slowLeft -= dt;
+      dt *= 0.35;
+    }
+
     const k = this.keys;
     const controls = this.player.controls;
     controls.left = k.LEFT.isDown || k.A.isDown || this.touch.left;
@@ -686,6 +824,8 @@ export default class Climb extends Phaser.Scene {
 
     this.player.update(dt);
     this.updateCritters(dt);
+    this.updateRollers(dt);
+    this.checkLostGround();
     if (this.player.mode === 'skid') this.puff(this.player.x, this.player.y, 0xe0f7ff, 1);
     if (this.run.started && !this.run.done) this.run.time += dt;
 
