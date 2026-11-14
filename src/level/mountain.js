@@ -62,8 +62,25 @@ export function buildMountain() {
   for (let x = 0; x < summit.w; x += spacing) heights.push(world.summitY);
   const width = (heights.length - 1) * spacing;
 
+  // rock walls: a dip then a step too tall for a normal hop at low spring, so you have to charge
+  const walls = [];
+  for (let x = 2200; x < summit.x - 900; x += between(1300, 2000)) {
+    const i = Math.round(x / spacing);
+    const h = walls.length ? Math.round(between(level.wallMin, level.wallMax)) : level.wallMin;
+    const ditch = Math.round(between(260, 360) / spacing);
+    for (let k = 1; k <= ditch; k++) {
+      const t = 1 - (k - 1) / ditch;
+      heights[i - k] += h * t * t * (3 - 2 * t);
+    }
+    walls.push({ x: i * spacing, h, from: (i - ditch) * spacing });
+  }
+  const nearWall = (x, before = 420, after = 160) => walls.some((w) => x > w.x - before && x < w.x + after);
+  // the sample right before a wall stays flat so the wall is a real vertical face, not a steep ramp
+  const cliffs = new Set(walls.map((w) => w.x / spacing - 1));
+
   const heightAt = (x) => {
     const i = Math.min(heights.length - 2, Math.max(0, Math.floor(x / spacing)));
+    if (cliffs.has(i)) return heights[i];
     const t = Math.min(1, Math.max(0, x / spacing - i));
     return heights[i] + (heights[i + 1] - heights[i]) * t;
   };
@@ -72,6 +89,7 @@ export function buildMountain() {
   const line = heights.slice();
   const lineAt = (x) => {
     const i = Math.min(line.length - 2, Math.max(0, Math.floor(x / spacing)));
+    if (cliffs.has(i)) return line[i];
     const t = Math.min(1, Math.max(0, x / spacing - i));
     return line[i] + (line[i + 1] - line[i]) * t;
   };
@@ -80,6 +98,7 @@ export function buildMountain() {
   const boulders = [];
   for (let x = 1400; x < summit.x - 800; x += between(350, 900)) {
     const r = Math.round(between(16, 34));
+    if (nearWall(x, 460, 120)) continue;
     const centerY = heightAt(x) + r * 0.45;
     boulders.push({ x, y: centerY, r });
     for (let i = Math.floor((x - r) / spacing); i <= Math.ceil((x + r) / spacing); i++) {
@@ -111,6 +130,7 @@ export function buildMountain() {
       else x = from;
     }
 
+    if (nearWall(x, 420 + length, 120)) continue;
     patches.push({ from: x, to: x + length, kind });
   }
 
@@ -127,6 +147,7 @@ export function buildMountain() {
     const zone = zoneAt(progressAt(x));
     const range = between(60, 140);
     let kind = enemyMix[zone][Math.floor(random() * 5)];
+    if (nearWall(x - range, 420, 160) || nearWall(x + range, 420, 160)) continue;
     // snowballs while you skid on ice is just mean
     const nearIce = patches.some((p) => p.kind === 'ice' && x > p.from - 450 && x < p.to + 250);
     if (kind === 'tourist' && nearIce) kind = 'fox';
@@ -151,13 +172,13 @@ export function buildMountain() {
   // just two signs, at the zone changes
   const decor = [];
   for (const x of [summit.x * zones[0].upTo - 140, summit.x * zones[1].upTo - 140]) {
-    if (!onPatch(x)) decor.push({ kind: 'signpost', x });
+    if (!onPatch(x) && !nearWall(x, 500, 200)) decor.push({ kind: 'signpost', x });
   }
 
   // huts go on the three flattest spots of the lower mountain
   const spots = [];
   for (let x = 1200; x < summit.x * 0.65; x += 120) {
-    if (!onPatch(x)) spots.push({ x, tilt: tilt(x, 110) });
+    if (!onPatch(x) && !nearWall(x, 500, 200)) spots.push({ x, tilt: tilt(x, 110) });
   }
   spots.sort((a, b) => a.tilt - b.tilt);
   const huts = [];
@@ -167,7 +188,7 @@ export function buildMountain() {
   huts.forEach((x) => decor.push({ kind: 'hut', x }));
 
   for (let x = 200; x < summit.x * 0.4; x += between(120, 380)) {
-    if (!onPatch(x)) decor.push({ kind: 'flowers', x });
+    if (!onPatch(x) && !nearWall(x, 60, 40)) decor.push({ kind: 'flowers', x });
   }
 
   // cable car pylons through the cliffs, joined by a cable
@@ -176,7 +197,7 @@ export function buildMountain() {
 
   return {
     heights, spacing, width, bottomY, summit,
-    boulders, patches, enemies, pickups, trees, decor, pylons,
+    boulders, patches, enemies, pickups, trees, decor, pylons, walls,
     heightAt, lineAt, slopeAt, surfaceAt, progressAt,
   };
 }

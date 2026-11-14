@@ -164,14 +164,62 @@ export default class Climb extends Phaser.Scene {
       this.add.image(boulder.x, boulder.y, tex.boulder).setDisplaySize(boulder.r * 2, boulder.r * 2).setDepth(0);
     }
 
-    const sink = { signpost: 4, hut: 8, flowers: 5 };
+    const sink = { hut: 8, flowers: 5 };
     for (const item of mountain.decor) {
+      if (item.kind === 'signpost') {
+        this.drawSign(item.x, mountain.lineAt(item.x) + 6);
+        continue;
+      }
       this.add.image(item.x, mountain.lineAt(item.x) + sink[item.kind], tex[item.kind])
         .setOrigin(0.5, 1)
         .setDepth(item.kind === 'flowers' ? 3.5 : 2);
     }
 
+    for (const wall of mountain.walls) this.drawWall(wall);
+
     this.makeCable();
+  }
+
+  // yellow alpine trail sign on a wooden post
+  drawSign(x, groundY) {
+    const g = this.add.graphics().setDepth(2);
+    g.fillStyle(0x3d2b1f).fillRect(x - 4, groundY - 62, 8, 62);
+    g.fillStyle(0x8b5a2b).fillRect(x - 2, groundY - 62, 4, 62);
+
+    const board = (y, width) => {
+      g.fillStyle(0x3d2b1f).fillPoints([
+        { x: x - 8, y: y - 2 }, { x: x + width, y: y - 2 }, { x: x + width + 12, y: y + 8 },
+        { x: x + width, y: y + 18 }, { x: x - 8, y: y + 18 },
+      ], true);
+      g.fillStyle(0xffd60a).fillPoints([
+        { x: x - 6, y }, { x: x + width, y }, { x: x + width + 9, y: y + 8 }, { x: x + width, y: y + 16 }, { x: x - 6, y: y + 16 },
+      ], true);
+      g.fillStyle(0xfff3b0).fillRect(x - 6, y, width + 2, 2);
+    };
+    board(groundY - 60, 96);
+    board(groundY - 38, 64);
+
+    // red white red trail marker
+    g.fillStyle(0xd62828).fillRect(x - 4, groundY - 16, 8, 3).fillRect(x - 4, groundY - 10, 8, 3);
+    g.fillStyle(0xffffff).fillRect(x - 4, groundY - 13, 8, 3);
+
+    const ink = { ...textStyle, fontSize: '8px', color: '#3d2b1f', strokeThickness: 0 };
+    this.add.text(x, groundY - 56, 'ZUGSPITZE', ink).setDepth(2.1);
+    this.add.text(x, groundY - 34, '2962 m', ink).setDepth(2.1);
+  }
+
+  drawWall(wall) {
+    const { lineAt } = this.mountain;
+    const top = lineAt(wall.x);
+    const bottom = top + wall.h;
+    const g = this.add.graphics().setDepth(3.2);
+    g.fillStyle(0x4a4e5a).fillRect(wall.x - 18, top, 20, wall.h + 6);
+    g.fillStyle(0x6c7486).fillRect(wall.x - 14, top + 4, 12, wall.h);
+    g.fillStyle(0x8d99ae);
+    for (let y = top + 14; y < bottom - 6; y += 22) g.fillRect(wall.x - 12, y, 8, 3);
+    g.fillStyle(0x2f3340);
+    for (let y = top + 24; y < bottom - 6; y += 30) g.fillRect(wall.x - 16, y, 3, 10);
+    g.fillStyle(surfaceColors[zones[zoneAt(this.mountain.progressAt(wall.x))].surface]).fillRect(wall.x - 20, top - 2, 26, 7);
   }
 
   // hides the straight cut between two soil types behind a ragged pixel edge
@@ -283,6 +331,22 @@ export default class Climb extends Phaser.Scene {
       sfx.slip();
       this.puff(this.player.x, this.player.y, 0xcaf0f8, 10);
     });
+    this.events.on('bonk', () => {
+      sfx.rock();
+      this.puff(this.player.x, this.player.y - 20, 0x8d99ae, 6);
+    });
+  }
+
+  // first time you reach a wall without enough spring, tell them about charging
+  checkWallHint() {
+    if (this.wallHinted) return;
+    const player = this.player;
+    const wall = this.mountain.walls.find((w) => player.x > w.from - 60 && player.x < w.x);
+    if (!wall) return;
+    const normal = pogo.minBounce + (pogo.maxBounce - pogo.minBounce) * player.spring;
+    if (normal >= wall.h + 10 || player.supercharged) return;
+    this.wallHinted = true;
+    this.message('HOLD SPACE TO CHARGE!', '#caf0f8');
   }
 
   puff(x, y, color, count = 6) {
@@ -523,5 +587,6 @@ export default class Climb extends Phaser.Scene {
     this.updateProgress();
     this.updateBackground();
     this.checkZone();
+    this.checkWallHint();
   }
 }

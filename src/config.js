@@ -16,6 +16,7 @@ export const pogo = {
   minBounce: 40,
   maxBounce: 150,
   superBonus: 0.6,
+  chargeBoost: 80,
   crouchTime: 0.6,
   launchSpeed: 190,
   airAccel: 300,
@@ -50,4 +51,6 @@ export const enemyRespawn = 20000;
 export const level = {
   seed: 2962,
   maxSlope: 0.85, // steepest uphill, still easy to hop up even with a dead spring
+  wallMin: 100,
+  wallMax: 125, // a full charge clears this even with a dead spring
 };

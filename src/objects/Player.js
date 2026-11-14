@@ -54,8 +54,9 @@ export default class Player {
 
   bounce(charge = 0, bonus = 0, free = false) {
     const power = this.supercharged ? 1 : this.spring;
-    let height = (pogo.minBounce + (pogo.maxBounce - pogo.minBounce) * power) * (1 + pogo.superBonus * charge) + bonus;
-    const slope = this.mountain.slopeAt(this.x);
+    let height = (pogo.minBounce + (pogo.maxBounce - pogo.minBounce) * power) * (1 + pogo.superBonus * charge) + pogo.chargeBoost * charge + bonus;
+    // clamp so standing right next to a rock wall doesnt fling you backwards
+    const slope = Phaser.Math.Clamp(this.mountain.slopeAt(this.x), -1, 1);
 
     let vx = this.tilt * pogo.launchSpeed + slope * pogo.slopePush;
     if (this.onIce && !free) {
@@ -116,9 +117,17 @@ export default class Player {
       else this.vx *= 1 - pogo.airDrag * dt;
       this.vy = Math.min(maxFall, this.vy + gravity * dt);
 
+      const fromX = this.x;
       this.x += this.vx * dt;
       this.y += this.vy * dt;
       this.keepInWorld();
+
+      // bumped into a rock wall instead of clearing it
+      if (this.y > mountain.heightAt(this.x) + 2 && mountain.heightAt(fromX) - mountain.heightAt(this.x) > 10) {
+        this.x = fromX;
+        this.vx = -this.vx * 0.3;
+        this.scene.events.emit('bonk');
+      }
 
       const ground = mountain.heightAt(this.x);
       if (this.y >= ground) {
@@ -127,17 +136,11 @@ export default class Player {
       }
     } else if (this.mode === 'crouch') {
       this.charge = Math.min(1, this.charge + dt / pogo.crouchTime);
-      if (this.onIce) {
-        this.vx += mountain.slopeAt(this.x) * pogo.iceSlide * dt;
-        this.x += this.vx * dt;
-        this.keepInWorld();
-      }
+      if (this.onIce) this.slide(dt);
       this.y = mountain.heightAt(this.x);
       if (!jump) this.bounce(this.charge);
     } else if (this.mode === 'skid') {
-      this.vx += mountain.slopeAt(this.x) * pogo.iceSlide * dt;
-      this.x += this.vx * dt;
-      this.keepInWorld();
+      this.slide(dt);
       this.y = mountain.heightAt(this.x);
       this.skidLeft -= dt;
       if (this.skidLeft <= 0 || mountain.surfaceAt(this.x) !== 'ice') {
@@ -156,6 +159,18 @@ export default class Player {
     if (this.superLeft > 0) this.superLeft -= dt;
     if (this.hurtLeft > 0) this.hurtLeft -= dt;
     this.updateSprite(dt);
+  }
+
+  slide(dt) {
+    const mountain = this.mountain;
+    const fromX = this.x;
+    this.vx += Phaser.Math.Clamp(mountain.slopeAt(this.x), -1, 1) * pogo.iceSlide * dt;
+    this.x += this.vx * dt;
+    this.keepInWorld();
+    if (mountain.heightAt(fromX) - mountain.heightAt(this.x) > 10) {
+      this.x = fromX;
+      this.vx = 0;
+    }
   }
 
   keepInWorld() {
