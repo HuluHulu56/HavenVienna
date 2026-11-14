@@ -61,7 +61,7 @@ export default class Player {
     if (this.onIce && !free) {
       // no grip, so a weaker and wonkier bounce
       height = Math.max(pogo.minBounce, height * pogo.iceGrip);
-      vx = vx * 0.5 + this.vx * 0.7 + slope * 250 + Phaser.Math.Between(-120, 120);
+      vx = vx * 0.8 + this.vx * 0.4 + Phaser.Math.Between(-70, 70);
     }
 
     this.vx = Phaser.Math.Clamp(vx, -pogo.airSpeed, pogo.airSpeed);

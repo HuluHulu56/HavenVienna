@@ -94,8 +94,23 @@ export function buildMountain() {
   for (let x = 1600; x < summit.x - 400; x += between(500, 1100)) {
     const zone = zoneAt(progressAt(x));
     const r = random();
-    const kind = zone === 0 ? (r < 0.7 ? 'rock' : 'ice') : zone === 1 ? (r < 0.5 ? 'rock' : 'ice') : (r < 0.25 ? 'rock' : 'ice');
+    let kind = zone === 0 ? (r < 0.7 ? 'rock' : 'ice') : zone === 1 ? (r < 0.5 ? 'rock' : 'ice') : (r < 0.25 ? 'rock' : 'ice');
     const length = kind === 'ice' ? between(220, 480) : between(120, 300);
+
+    // no ice on steep bits, you'd never get up them, so slide it along to a flatter spot
+    if (kind === 'ice') {
+      const tooSteep = (from) => {
+        for (let sx = from - 40; sx <= from + length + 40; sx += 16) {
+          if ((heightAt(sx - 16) - heightAt(sx + 16)) / 32 > 0.6) return true;
+        }
+        return false;
+      };
+      let from = x;
+      while (from < x + 900 && tooSteep(from)) from += 48;
+      if (tooSteep(from) || from + length > summit.x - 400) kind = 'rock';
+      else x = from;
+    }
+
     patches.push({ from: x, to: x + length, kind });
   }
 

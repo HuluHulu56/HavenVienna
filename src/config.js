@@ -22,9 +22,9 @@ export const pogo = {
   airSpeed: 210,
   airDrag: 0.6,
   slopePush: 90, // slopes nudge you back downhill
-  iceSlide: 900,
-  iceSkid: 0.45, // seconds you skid on ice before you can bounce again
-  iceGrip: 0.7,
+  iceSlide: 500,
+  iceSkid: 0.3, // seconds you skid on ice before you can bounce again
+  iceGrip: 0.85,
   tiltSpeed: 3,
   tiltBack: 2.2,
   bounceDrain: 0.022,
