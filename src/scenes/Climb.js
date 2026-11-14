@@ -500,13 +500,22 @@ export default class Climb extends Phaser.Scene {
   updateCritters(dt) {
     const player = this.player;
     const me = player.bounds;
-    const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 
     for (const enemy of this.enemies) {
       enemy.update(dt, player);
-      if (enemy.dead || player.mode === 'done' || !overlaps(me, enemy.bounds)) continue;
-      if (player.mode === 'air' && player.vy > 0 && player.y < enemy.bounds.top + 16) this.stomp(enemy);
-      else if (player.hurt(enemy.x, enemy.kind === 'yeti' ? pogo.yetiDrain : pogo.hitDrain)) this.floatText(player.x, player.y - 60, '-SPRING', '#ef476f');
+      if (enemy.dead || player.mode === 'done') continue;
+
+      const bounds = enemy.bounds;
+      const bites = enemy.kind === 'yeti' || enemy.kind === 'fox';
+      const reach = bites ? 6 : 0;
+      if (me.right + reach <= bounds.left || me.left - reach >= bounds.right || me.bottom <= bounds.top || me.top >= bounds.bottom) continue;
+
+      const centered = !bites || Math.abs(player.x - enemy.x) <= (bounds.right - bounds.left) / 3;
+      if (centered && player.mode === 'air' && player.vy > 0 && me.bottom < bounds.top + (bites ? 12 : 16)) {
+        this.stomp(enemy);
+      } else if (player.hurt(enemy.x, enemy.kind === 'yeti' ? pogo.yetiDrain : pogo.hitDrain)) {
+        this.floatText(player.x, player.y - 60, bites ? 'BITE!' : '-SPRING', '#ef476f');
+      }
     }
 
     for (const pickup of this.pickups) {

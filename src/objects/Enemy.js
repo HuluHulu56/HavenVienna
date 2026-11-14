@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { enemyRespawn } from '../config.js';
 import { tex } from '../assets.js';
 
-const speeds = { yeti: 40, fox: 110, tourist: 0 };
+const speeds = { yeti: 40, fox: 140, tourist: 0 };
 const chaseSpeed = 95;
 const chaseRange = 280;
 const leash = 320;
@@ -101,18 +101,24 @@ export default class Enemy {
         this.shoutedAt = this.scene.time.now;
       }
       this.chasing = true;
-      if (Math.abs(dx) > 14) this.dir = Math.sign(dx);
-      const speed = this.hopLeft > 0 ? chaseSpeed * 1.8 : chaseSpeed;
-      if (Math.abs(dx) > 14 || this.hopLeft > 0) this.x += this.dir * speed * dt;
+
+      if (this.hopLeft > 0) {
+        this.x += this.dir * chaseSpeed * 1.8 * dt;
+      } else {
+        if (dx) this.dir = Math.sign(dx);
+        const gap = player.mode === 'air' ? 32 : 16;
+        const step = Math.min(chaseSpeed * dt, Math.max(0, Math.abs(dx) - gap));
+        this.x += this.dir * step;
+
+        this.hopWait -= dt;
+        if (Math.abs(dx) < 95 && player.y > this.y - 68 && this.hopWait <= 0) {
+          this.hop(0.45, 46);
+          this.hopWait = 1;
+        }
+      }
+
       this.sprite.setFlipX(this.dir < 0);
       this.sprite.setTint(Math.floor(this.scene.time.now / 120) % 2 ? 0xffb3b3 : 0xffffff);
-
-      // lunge when close
-      this.hopWait -= dt;
-      if (Math.abs(dx) < 130 && this.hopWait <= 0 && this.hopLeft === 0) {
-        this.hop(0.45, 46);
-        this.hopWait = 1.4;
-      }
     } else {
       if (this.chasing) this.sprite.clearTint();
       this.chasing = false;
