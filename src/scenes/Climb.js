@@ -422,10 +422,15 @@ export default class Climb extends Phaser.Scene {
       sfx.slip();
       this.puff(this.player.x, this.player.y, 0xcaf0f8, 10);
     });
-    this.events.on('bonk', () => {
+    let nextBonk = 0;
+    const bonk = () => {
+      if (this.time.now < nextBonk) return;
+      nextBonk = this.time.now + 400;
       sfx.rock();
       this.puff(this.player.x, this.player.y - 20, 0x8d99ae, 6);
-    });
+    };
+    this.events.on('bonk', bonk);
+    this.events.once('shutdown', () => this.events.off('bonk', bonk));
   }
 
   // first time you reach a wall without enough spring, tell them about charging
