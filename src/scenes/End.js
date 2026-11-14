@@ -167,7 +167,7 @@ export default class End extends Phaser.Scene {
 
     const name = this.add.text(16, 16, 'ZUGSPITZE', { ...textStyle, fontSize: '12px', color: '#263046', strokeThickness: 0 });
     const altitude = this.add.text(16, 40, '2,962 m', { ...textStyle, fontSize: '12px', color: '#263046', strokeThickness: 0 });
-    this.plaque = this.add.container(24, 24, [frame, name, altitude]).setDepth(20).setScale(0);
+    this.plaque = this.add.container(100, 105, [frame, name, altitude]).setDepth(20).setScale(0);
   }
 
   makeBook() {
