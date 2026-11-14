@@ -24,7 +24,7 @@ export default class Hud extends Phaser.Scene {
     this.banners = [];
     this.bannerBusy = false;
 
-    this.add.image(meterX + 11, meterY - 22, tex.coil);
+    this.coilIcon = this.add.image(meterX + 11, meterY - 22, tex.coil);
     this.timeText = this.add.text(480, 14, '00:00.00', { ...textStyle, fontSize: '24px' }).setOrigin(0.5, 0);
     this.altText = this.add.text(altX - 16, 0, '', textStyle).setOrigin(1, 0.5);
     this.banner = this.add.text(480, 190, '', { ...textStyle, fontSize: '32px', strokeThickness: 6 }).setOrigin(0.5).setAlpha(0);
@@ -147,12 +147,12 @@ export default class Hud extends Phaser.Scene {
 
     const spring = player.supercharged ? 1 : player.spring;
     const low = !player.supercharged && spring < 0.25;
-    const blink = low && Math.floor(time / 180) % 2 === 0;
-    let color = spring > 0.5 ? 0x80ed99 : spring > 0.25 ? 0xffd166 : 0xef476f;
+    let color = spring > 0.5 ? 0x80ed99 : spring > 0.25 ? 0xffd166 : 0xf8961e;
     if (player.supercharged) color = 0xffd60a;
-    if (blink) color = 0xffffff;
-    g.fillStyle(low ? 0x9d0208 : 0x1b263b, low ? 0.9 : 0.7).fillRect(meterX - 4, meterY - 4, 30, meterHeight + 8);
-    g.fillStyle(color, 1).fillRect(meterX, meterY + meterHeight * (1 - spring), 22, meterHeight * spring);
+    const fillAlpha = low ? 0.7 + 0.3 * Math.sin(time / 260) : 1;
+    g.fillStyle(0x1b263b, 0.7).fillRect(meterX - 4, meterY - 4, 30, meterHeight + 8);
+    g.fillStyle(color, fillAlpha).fillRect(meterX, meterY + meterHeight * (1 - spring), 22, meterHeight * spring);
+    this.coilIcon.setAngle(low ? Math.sin(time / 180) * 10 : 0);
 
     const superLeft = Math.max(0, player.superLeft);
     this.superIcon.setVisible(superLeft > 0);
