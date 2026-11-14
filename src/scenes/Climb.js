@@ -100,6 +100,23 @@ export default class Climb extends Phaser.Scene {
     const mountain = this.mountain;
     this.chunks = [];
 
+    const zoneOf = (from) => zoneAt(mountain.progressAt(Math.min(mountain.width, from + chunkSize / 2)));
+    const borders = [];
+    for (let from = chunkSize; from < mountain.width; from += chunkSize) {
+      if (zoneOf(from) !== zoneOf(from - chunkSize)) borders.push({ x: from, before: zoneOf(from - chunkSize), after: zoneOf(from) });
+    }
+
+    // surface colour fades into the next zone's colour over the last bit before a border
+    const blend = 260;
+    const surfaceColor = (x) => {
+      const border = borders.find((b) => x > b.x - blend && x <= b.x);
+      if (!border) return surfaceColors[zones[zoneOf(Math.floor(x / chunkSize) * chunkSize)].surface];
+      const from = Phaser.Display.Color.ValueToColor(surfaceColors[zones[border.before].surface]);
+      const to = Phaser.Display.Color.ValueToColor(surfaceColors[zones[border.after].surface]);
+      const mix = Phaser.Display.Color.Interpolate.ColorWithColor(from, to, blend, x - (border.x - blend));
+      return Phaser.Display.Color.GetColor(mix.r, mix.g, mix.b);
+    };
+
     // each chunk is a tiled ground texture cut to the slope shape with a mask
     for (let from = 0; from < mountain.width; from += chunkSize) {
       const to = Math.min(mountain.width, from + chunkSize);
@@ -110,18 +127,28 @@ export default class Climb extends Phaser.Scene {
       shape.fillStyle(0xffffff);
       shape.fillPoints([...top, new Phaser.Math.Vector2(to, world.height), new Phaser.Math.Vector2(from, world.height)], true);
 
-      const zone = zones[zoneAt(mountain.progressAt((from + to) / 2))];
-      const fill = this.add.tileSprite(from, minY, to - from + 2, world.height - minY, tex[zone.fill]).setOrigin(0, 0).setDepth(1);
+      const zone = zones[zoneOf(from)];
+      const fill = this.add.tileSprite(from, minY, to - from + 2, world.height - minY, tex[zone.fill])
+        .setOrigin(0, 0)
+        .setTilePosition(from, minY)
+        .setDepth(1);
       fill.setMask(shape.createGeometryMask());
 
       const edge = this.add.graphics().setDepth(3);
-      edge.lineStyle(14, surfaceColors[zone.surface]);
-      edge.strokePoints(top.map((p) => new Phaser.Math.Vector2(p.x, p.y + 5)));
+      for (let i = 1; i < top.length; i++) {
+        const a = top[i - 1];
+        const b = top[i];
+        const color = surfaceColor((a.x + b.x) / 2);
+        edge.lineStyle(14, color).lineBetween(a.x, a.y + 5, b.x, b.y + 5);
+        edge.fillStyle(color).fillCircle(b.x, b.y + 5, 7);
+      }
       edge.lineStyle(3, 0x000000, 0.15);
       edge.strokePoints(top.map((p) => new Phaser.Math.Vector2(p.x, p.y + 12)));
 
       this.chunks.push({ from, to, parts: [fill, edge] });
     }
+
+    for (const border of borders) this.makeSeam(border);
 
     const patches = this.add.graphics().setDepth(3);
     for (const patch of mountain.patches) {
@@ -136,6 +163,90 @@ export default class Climb extends Phaser.Scene {
     for (const boulder of mountain.boulders) {
       this.add.image(boulder.x, boulder.y, tex.boulder).setDisplaySize(boulder.r * 2, boulder.r * 2).setDepth(0);
     }
+
+    const sink = { signpost: 4, hut: 8, flowers: 5 };
+    for (const item of mountain.decor) {
+      this.add.image(item.x, mountain.lineAt(item.x) + sink[item.kind], tex[item.kind])
+        .setOrigin(0.5, 1)
+        .setDepth(item.kind === 'flowers' ? 3.5 : 2);
+    }
+
+    this.makeCable();
+  }
+
+  // hides the straight cut between two soil types behind a ragged pixel edge
+  makeSeam(border) {
+    const { lineAt } = this.mountain;
+    const width = 240;
+    const from = border.x - width;
+    const step = 8;
+    const snap = (v) => Math.round(v / step) * step;
+
+    const edge = [];
+    for (let y = world.height; ; y -= step) {
+      const wobble = Math.sin(y / 53) * 55 + Math.sin(y / 19) * 22;
+      const x = snap(border.x - width / 2 + wobble);
+      if (y <= lineAt(x)) {
+        edge.push(new Phaser.Math.Vector2(x, lineAt(x)));
+        break;
+      }
+      edge.push(new Phaser.Math.Vector2(x, y));
+    }
+
+    const right = border.x + 16;
+    const top = this.surfacePoints(edge[edge.length - 1].x, right);
+    const minY = Math.min(...top.map((p) => p.y));
+    const shape = this.make.graphics({ add: false });
+    shape.fillStyle(0xffffff);
+    shape.fillPoints([...top, new Phaser.Math.Vector2(right, world.height), ...edge], true);
+
+    // loose crumbs of the new soil past the ragged edge
+    for (let i = 0; i < 70; i++) {
+      const x = snap(from + Math.random() * width * 0.7);
+      const y = snap(lineAt(x) + 14 + Math.random() * 500);
+      shape.fillRect(x, y, step, step);
+    }
+
+    const fill = this.add.tileSprite(from, minY, width + 16, world.height - minY, tex[zones[border.after].fill])
+      .setOrigin(0, 0)
+      .setTilePosition(from, minY)
+      .setDepth(1.1);
+    fill.setMask(shape.createGeometryMask());
+    this.chunks.push({ from, to: right, parts: [fill] });
+  }
+
+  makeCable() {
+    const { pylons, lineAt } = this.mountain;
+    if (!pylons.length) return;
+
+    // cables hang off the tips of the crossarm, 13px down from the top of the sprite
+    const tops = pylons.map((x) => {
+      const base = lineAt(x) + 10;
+      this.add.image(x, base, tex.cablePylon).setOrigin(0.5, 1).setDepth(0.5);
+      return { x, y: base - 120 + 13 };
+    });
+
+    // anchor both ends in the ground so the line doesnt stop in mid air
+    const first = pylons[0] - 260;
+    const last = pylons[pylons.length - 1] + 260;
+    const route = [{ x: first, y: lineAt(first) }, ...tops, { x: last, y: lineAt(last) }];
+
+    const cable = this.add.graphics().setDepth(0.6);
+    for (const [side, sagSize] of [[-12, 50], [13, 60]]) {
+      cable.lineStyle(2, 0x2b2d42, 0.9);
+      for (let i = 1; i < route.length; i++) {
+        const a = route[i - 1];
+        const b = route[i];
+        const ax = i === 1 ? a.x : a.x + side;
+        const bx = i === route.length - 1 ? b.x : b.x + side;
+        const sag = i === 1 || i === route.length - 1 ? 10 : sagSize;
+        const points = [];
+        for (let t = 0; t <= 1.001; t += 0.05) {
+          points.push(new Phaser.Math.Vector2(ax + (bx - ax) * t, a.y + (b.y - a.y) * t + Math.sin(t * Math.PI) * sag));
+        }
+        cable.strokePoints(points);
+      }
+    }
   }
 
   makeCritters() {
@@ -145,19 +256,23 @@ export default class Climb extends Phaser.Scene {
   }
 
   makeEffects() {
-    this.dust = this.add.particles(0, 0, tex.dot, {
+    const orDot = (key) => (this.textures.exists(key) ? key : tex.dot);
+
+    this.dust = this.add.particles(0, 0, orDot(tex.dust), {
       speed: { min: 30, max: 110 },
       angle: { min: 200, max: 340 },
       gravityY: 300,
       lifespan: 450,
-      scale: { start: 0.9, end: 0 },
+      scale: { start: 1, end: 0.2 },
+      alpha: { start: 1, end: 0 },
       emitting: false,
     }).setDepth(9);
 
-    this.sparkle = this.add.particles(0, 0, tex.dot, {
+    this.sparkle = this.add.particles(0, 0, orDot(tex.sparkle), {
       speed: { min: 20, max: 60 },
       lifespan: 500,
-      scale: { start: 0.8, end: 0 },
+      scale: { start: 1, end: 0 },
+      rotate: { min: 0, max: 90 },
       tint: [0xffd60a, 0xffffff],
       frequency: 40,
       emitting: false,
@@ -173,6 +288,13 @@ export default class Climb extends Phaser.Scene {
   puff(x, y, color, count = 6) {
     this.dust.setParticleTint(color);
     this.dust.explode(count, x, y);
+  }
+
+  splat(x, y) {
+    this.puff(x, y, 0xffffff, 4);
+    if (!this.textures.exists(tex.splat)) return;
+    const mark = this.add.image(x, y, tex.splat).setOrigin(0.5, 1).setDepth(4);
+    this.tweens.add({ targets: mark, alpha: 0, delay: 600, duration: 500, onComplete: () => mark.destroy() });
   }
 
   floatText(x, y, text, color = '#ffffff') {
@@ -241,7 +363,7 @@ export default class Climb extends Phaser.Scene {
       const hitPlayer = Math.abs(ball.x - player.x) < 12 && ball.y > me.top && ball.y < me.bottom;
       if (hitPlayer && player.hurt(ball.x, pogo.snowballDrain)) this.floatText(player.x, player.y - 60, 'SPLAT!', '#caf0f8');
       if (hitPlayer || ball.age > 3 || ball.y > this.mountain.heightAt(ball.x)) {
-        this.puff(ball.x, ball.y, 0xffffff, 6);
+        this.splat(ball.x, Math.min(ball.y, this.mountain.heightAt(ball.x)));
         ball.sprite.destroy();
         ball.done = true;
       }

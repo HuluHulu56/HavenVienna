@@ -58,11 +58,11 @@ export default class Enemy {
       this.sprite.setFlipX(player.x < this.x);
       this.sprite.angle = Math.sin(this.scene.time.now / 90) * 4;
       this.throwWait -= dt;
-      const close = Math.abs(player.x - this.x) < 520 && Math.abs(player.y - this.y) < 300;
+      const close = Math.abs(player.x - this.x) < 470 && Math.abs(player.y - this.y) < 280;
       if (close && this.throwWait <= 0) {
-        this.throwWait = Phaser.Math.FloatBetween(1.3, 2.2);
+        this.throwWait = Phaser.Math.FloatBetween(1.8, 2.8);
         this.scene.throwSnowball(this);
-        if (Math.random() < 0.35) this.scene.time.delayedCall(180, () => !this.dead && this.scene.throwSnowball(this));
+        if (Math.random() < 0.15) this.scene.time.delayedCall(220, () => !this.dead && this.scene.throwSnowball(this));
       }
     }
 
@@ -86,27 +86,37 @@ export default class Enemy {
   updateYeti(dt, player) {
     const dx = player.x - this.x;
     const sees = Math.abs(dx) < chaseRange && Math.abs(player.y - this.y) < 200 && player.mode !== 'done';
-    const tooFar = Math.abs(this.x - this.home) > leash;
+    this.calmLeft = Math.max(0, (this.calmLeft ?? 0) - dt);
 
-    if (sees && !tooFar) {
-      if (!this.chasing) this.scene.floatText(this.x, this.y - 40, '!', '#ef476f');
+    // ran too far from home, so walk back and calm down for a bit before chasing again
+    if (this.chasing && Math.abs(this.x - this.home) > leash) {
+      this.chasing = false;
+      this.calmLeft = 2.5;
+      this.sprite.clearTint();
+    }
+
+    if (sees && this.calmLeft === 0) {
+      if (!this.chasing && this.scene.time.now - (this.shoutedAt ?? -9999) > 4000) {
+        this.scene.floatText(this.x, this.y - 40, '!', '#ef476f');
+        this.shoutedAt = this.scene.time.now;
+      }
       this.chasing = true;
-      this.dir = Math.sign(dx) || 1;
+      if (Math.abs(dx) > 14) this.dir = Math.sign(dx);
       const speed = this.hopLeft > 0 ? chaseSpeed * 1.8 : chaseSpeed;
-      this.x += this.dir * speed * dt;
+      if (Math.abs(dx) > 14 || this.hopLeft > 0) this.x += this.dir * speed * dt;
       this.sprite.setFlipX(this.dir < 0);
       this.sprite.setTint(Math.floor(this.scene.time.now / 120) % 2 ? 0xffb3b3 : 0xffffff);
 
       // lunge when close
       this.hopWait -= dt;
-      if (Math.abs(dx) < 110 && this.hopWait <= 0 && this.hopLeft === 0) {
+      if (Math.abs(dx) < 130 && this.hopWait <= 0 && this.hopLeft === 0) {
         this.hop(0.45, 46);
         this.hopWait = 1.4;
       }
     } else {
       if (this.chasing) this.sprite.clearTint();
       this.chasing = false;
-      if (tooFar) this.dir = Math.sign(this.home - this.x);
+      if (Math.abs(this.x - this.home) > 40 && this.calmLeft > 0) this.dir = Math.sign(this.home - this.x);
       this.patrol(dt, speeds.yeti);
     }
   }

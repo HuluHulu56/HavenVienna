@@ -126,7 +126,11 @@ export function buildMountain() {
   for (let x = 1500; x < summit.x - 300; x += between(450, 900)) {
     const zone = zoneAt(progressAt(x));
     const range = between(60, 140);
-    enemies.push({ kind: enemyMix[zone][Math.floor(random() * 5)], x, minX: x - range, maxX: x + range });
+    let kind = enemyMix[zone][Math.floor(random() * 5)];
+    // snowballs while you skid on ice is just mean
+    const nearIce = patches.some((p) => p.kind === 'ice' && x > p.from - 450 && x < p.to + 250);
+    if (kind === 'tourist' && nearIce) kind = 'fox';
+    enemies.push({ kind, x, minX: x - range, maxX: x + range });
   }
 
   const pickups = [];
@@ -141,9 +145,38 @@ export function buildMountain() {
     trees.push({ x, size: between(0.7, 1.3) });
   }
 
+  const tilt = (x, w) => Math.abs(lineAt(x - w / 2) - lineAt(x + w / 2)) / w;
+  const onPatch = (x) => patches.some((p) => x > p.from - 60 && x < p.to + 60);
+
+  // just two signs, at the zone changes
+  const decor = [];
+  for (const x of [summit.x * zones[0].upTo - 140, summit.x * zones[1].upTo - 140]) {
+    if (!onPatch(x)) decor.push({ kind: 'signpost', x });
+  }
+
+  // huts go on the three flattest spots of the lower mountain
+  const spots = [];
+  for (let x = 1200; x < summit.x * 0.65; x += 120) {
+    if (!onPatch(x)) spots.push({ x, tilt: tilt(x, 110) });
+  }
+  spots.sort((a, b) => a.tilt - b.tilt);
+  const huts = [];
+  for (const spot of spots) {
+    if (huts.length < 3 && huts.every((x) => Math.abs(x - spot.x) > 2500)) huts.push(spot.x);
+  }
+  huts.forEach((x) => decor.push({ kind: 'hut', x }));
+
+  for (let x = 200; x < summit.x * 0.4; x += between(120, 380)) {
+    if (!onPatch(x)) decor.push({ kind: 'flowers', x });
+  }
+
+  // cable car pylons through the cliffs, joined by a cable
+  const pylons = [];
+  for (let x = summit.x * 0.36; x < summit.x * 0.8; x += between(1500, 2000)) pylons.push(Math.round(x));
+
   return {
     heights, spacing, width, bottomY, summit,
-    boulders, patches, enemies, pickups, trees,
+    boulders, patches, enemies, pickups, trees, decor, pylons,
     heightAt, lineAt, slopeAt, surfaceAt, progressAt,
   };
 }
