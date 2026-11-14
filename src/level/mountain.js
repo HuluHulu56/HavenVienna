@@ -21,8 +21,8 @@ function seeded(seed) {
 
 const enemyMix = [
   ['tourist', 'tourist', 'fox', 'fox', 'yeti'],
-  ['fox', 'fox', 'yeti', 'tourist', 'yeti'],
-  ['yeti', 'yeti', 'yeti', 'fox', 'tourist'],
+  ['tourist', 'fox', 'yeti', 'tourist', 'yeti'],
+  ['yeti', 'tourist', 'yeti', 'fox', 'tourist'],
 ];
 
 const spacing = 16;
@@ -152,6 +152,18 @@ export function buildMountain() {
     const nearIce = patches.some((p) => p.kind === 'ice' && x > p.from - 450 && x < p.to + 250);
     if (kind === 'tourist' && nearIce) kind = 'fox';
     enemies.push({ kind, x, minX: x - range, maxX: x + range });
+  }
+
+  // every zone gets at least two tourists, as long as there's a spot away from the ice
+  const awayFromIce = (x) => !patches.some((p) => p.kind === 'ice' && x > p.from - 450 && x < p.to + 250);
+  for (let zone = 0; zone < zones.length; zone++) {
+    const inZone = enemies.filter((e) => zoneAt(progressAt(e.x)) === zone);
+    const spare = inZone.filter((e) => e.kind !== 'tourist' && awayFromIce(e.x));
+    let missing = 2 - inZone.filter((e) => e.kind === 'tourist').length;
+    while (missing > 0 && spare.length) {
+      spare.splice(Math.floor(random() * spare.length), 1)[0].kind = 'tourist';
+      missing -= 1;
+    }
   }
 
   const pickups = [];
