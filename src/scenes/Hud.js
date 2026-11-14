@@ -11,6 +11,7 @@ const altX = 920;
 const altY = 120;
 const altHeight = 330;
 const superWidth = 200;
+const touchRadius = 56;
 
 export default class Hud extends Phaser.Scene {
   constructor() {
@@ -34,15 +35,40 @@ export default class Hud extends Phaser.Scene {
     this.superIcon = this.add.image(480 - superWidth / 2 - 22, 62, tex.pretzel).setVisible(false);
     this.muteText = this.add.text(944, 16, 'MUTED', { ...textStyle, color: '#ef476f' }).setOrigin(1, 0).setVisible(false);
 
-    const hint = this.add.text(480, 504, 'LEFT/RIGHT tilt   hold SPACE for a super bounce\nM mute', {
+    const touch = this.sys.game.device.input.touch;
+    const hintText = touch ? 'hold JUMP for a super bounce' : 'LEFT/RIGHT tilt   hold SPACE for a super bounce\nM mute';
+    const hint = this.add.text(480, touch ? 300 : 504, hintText, {
       ...textStyle,
       align: 'center',
       lineSpacing: 8,
     }).setOrigin(0.5);
     this.tweens.add({ targets: hint, alpha: 0, delay: 9000, duration: 1000 });
+    if (touch) this.makeTouch();
 
     this.climb.events.on('message', this.showBanner, this);
     this.events.once('shutdown', () => this.climb.events.off('message', this.showBanner, this));
+  }
+
+  makeTouch() {
+    this.input.addPointer(2);
+    this.touchButton(80, 470, 'left', (icon) => icon.fillTriangle(14, -20, 14, 20, -18, 0));
+    this.touchButton(210, 470, 'right', (icon) => icon.fillTriangle(-14, -20, -14, 20, 18, 0));
+    this.touchButton(850, 470, 'jump', (icon) => icon.fillTriangle(-20, 4, 20, 4, 0, -26));
+    this.add.text(850, 490, 'JUMP', textStyle).setOrigin(0.5).setAlpha(0.8);
+  }
+
+  touchButton(x, y, key, drawIcon) {
+    const button = this.add.circle(x, y, touchRadius, 0xffffff, 0.2).setStrokeStyle(4, 0x1b263b, 0.5).setInteractive();
+    const icon = this.add.graphics({ x, y }).fillStyle(0xffffff, 0.8);
+    drawIcon(icon);
+
+    const press = (down) => {
+      this.climb.touch[key] = down;
+      button.setFillStyle(0xffffff, down ? 0.45 : 0.2);
+    };
+    button.on('pointerdown', () => press(true));
+    button.on('pointerup', () => press(false));
+    button.on('pointerout', () => press(false));
   }
 
   showBanner(text, color = '#ffd60a') {
