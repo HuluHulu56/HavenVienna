@@ -37,3 +37,4 @@ signpost - made by us
 hut - made by us
 flowers - made by us
 cablePylon - made by us
+itch cover, banner and icon - made by us
