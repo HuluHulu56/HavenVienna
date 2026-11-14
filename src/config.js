@@ -36,7 +36,7 @@ export const pogo = {
   snowballDrain: 0.06,
   stompRecharge: 0.28,
   stompBonus: 50,
-  superTime: 8,
+  superTime: 7,
   hurtTime: 1,
 };
 
