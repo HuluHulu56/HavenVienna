@@ -121,7 +121,19 @@ export default class End extends Phaser.Scene {
     this.raised = false;
 
     this.mugs = [];
-    if (!this.cheers) {
+    if (this.cheers) {
+      for (const sprite of [this.player, this.yeti]) {
+        sprite.anims.create({
+          key: 'chug',
+          frameRate: 10,
+          frames: [2, 3, 4, 3, 4, 3, 4, 3, 2].map((frame) => ({
+            key: sprite.texture.key,
+            frame,
+            duration: frame === 4 ? 130 : 0,
+          })),
+        });
+      }
+    } else {
       this.mugs.push({ sprite: this.player, spot: this.playerMug, image: this.add.image(0, 0, tex.beer).setFlipX(true).setDepth(6) });
       this.mugs.push({ sprite: this.yeti, spot: this.yetiMug, image: this.add.image(0, 0, tex.beer).setScale(2).setDepth(6) });
       if (this.yeti.height < 60) this.yeti.setScale(3);
@@ -270,23 +282,32 @@ export default class End extends Phaser.Scene {
       angle: 0,
       duration: 320,
       ease: 'Sine.out',
-      onComplete: () => this.sip(),
+      onComplete: () => this.chug(),
     });
   }
 
-  sip() {
-    this.tweens.add({ targets: this.player, angle: -10, duration: 350, hold: 500, yoyo: true, ease: 'Sine.inOut' });
+  chug() {
+    const lowerMugs = () => {
+      this.setRaised(false);
+      this.time.delayedCall(reclinkDelay, () => this.raise());
+    };
+
+    if (this.cheers) {
+      this.yeti.once('animationcomplete-chug', lowerMugs);
+      this.player.play('chug');
+      this.yeti.play('chug');
+      return;
+    }
+
+    this.tweens.add({ targets: this.player, angle: -10, duration: 220, yoyo: true, repeat: 2, ease: 'Sine.inOut' });
     this.tweens.add({
       targets: this.yeti,
-      angle: 8,
-      duration: 350,
-      hold: 500,
+      angle: 9,
+      duration: 220,
       yoyo: true,
+      repeat: 2,
       ease: 'Sine.inOut',
-      onComplete: () => {
-        this.setRaised(false);
-        this.time.delayedCall(reclinkDelay, () => this.raise());
-      },
+      onComplete: lowerMugs,
     });
   }
 
