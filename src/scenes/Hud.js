@@ -36,17 +36,60 @@ export default class Hud extends Phaser.Scene {
     this.muteText = this.add.text(944, 16, 'MUTED', { ...textStyle, color: '#ef476f' }).setOrigin(1, 0).setVisible(false);
 
     const touch = this.sys.game.device.input.touch;
-    const hintText = touch ? 'hold JUMP for a super bounce' : 'LEFT/RIGHT tilt   hold SPACE for a super bounce\nM mute';
+    const hintText = touch ? 'hold JUMP for a super bounce' : 'LEFT/RIGHT tilt   hold SPACE for a super bounce\nP pause   M mute';
     const hint = this.add.text(480, touch ? 300 : 504, hintText, {
       ...textStyle,
       align: 'center',
       lineSpacing: 8,
     }).setOrigin(0.5);
     this.tweens.add({ targets: hint, alpha: 0, delay: 9000, duration: 1000 });
+
+    this.makePause(touch);
     if (touch) this.makeTouch();
 
     this.climb.events.on('message', this.showBanner, this);
     this.events.once('shutdown', () => this.climb.events.off('message', this.showBanner, this));
+  }
+
+  makePause(touch) {
+    this.paused = false;
+    const shade = this.add.rectangle(480, 270, 960, 540, 0x0d1b2a, 0.6);
+    const title = this.add.text(480, 280, touch ? 'PAUSED - tap to go on' : 'PAUSED - press P', { ...textStyle, fontSize: '24px' })
+      .setOrigin(0.5);
+    const back = this.add.text(480, 330, touch ? 'tap here for the intro' : 'R back to the intro', { ...textStyle, color: '#caf0f8' })
+      .setOrigin(0.5)
+      .setPadding(12);
+    this.pauseScreen = this.add.container(0, 0, [shade, title, back]).setDepth(50).setVisible(false);
+
+    const keys = this.input.keyboard.addKeys('P,ESC,R');
+    keys.P.on('down', () => this.togglePause());
+    keys.ESC.on('down', () => this.togglePause());
+    keys.R.on('down', () => {
+      if (this.paused) this.quit();
+    });
+
+    if (!touch) return;
+    const button = this.add.text(790, 12, 'II', { ...textStyle, fontSize: '24px' }).setPadding(10).setInteractive();
+    button.on('pointerdown', () => this.togglePause());
+    shade.setInteractive().on('pointerdown', () => this.togglePause());
+    back.setInteractive().on('pointerdown', () => this.quit());
+  }
+
+  togglePause() {
+    if (this.climb.run.done) return;
+    this.paused = !this.paused;
+    this.pauseScreen.setVisible(this.paused);
+    if (this.paused) {
+      Object.keys(this.climb.touch).forEach((key) => { this.climb.touch[key] = false; });
+      this.scene.pause('Climb');
+    } else {
+      this.scene.resume('Climb');
+    }
+  }
+
+  quit() {
+    this.scene.stop('Climb');
+    this.scene.start('Intro');
   }
 
   makeTouch() {
