@@ -37,4 +37,4 @@ npm run dev
 
 ![prost](itch/screenshot7.png)
 
-made for a hackathon with the theme *bouncing back*. no yetis were harmed. one beer was.
+made for a hackclub haven hackathon with the theme *bouncing back*. no yetis were harmed. one beer was.
