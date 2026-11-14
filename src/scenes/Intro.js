@@ -10,7 +10,7 @@ const playerX = 560;
 const yetiHeight = 140;
 const needleSpeed = 4.2;
 const meterX = 280;
-const meterY = 180;
+const meterY = 150;
 const meterWidth = 400;
 const meterBands = [0x80ed99, 0xc5e17a, 0xffd166, 0xf8961e, 0xef476f];
 
@@ -96,10 +96,10 @@ export default class Intro extends Phaser.Scene {
   }
 
   makeTitle() {
-    this.title = this.add.text(gameWidth / 2, 90, 'ZUGSPITZE POGO', { ...textStyle, fontSize: '64px', strokeThickness: 12 })
+    this.title = this.add.text(gameWidth / 2, 90, 'ZUGSPITZE POGO', { ...textStyle, fontSize: '48px', strokeThickness: 8 })
       .setOrigin(0.5)
       .setDepth(30);
-    this.prompt = this.add.text(gameWidth / 2, 160, 'press SPACE', { ...textStyle, fontSize: '24px' }).setOrigin(0.5).setDepth(30);
+    this.prompt = this.add.text(gameWidth / 2, 160, 'press SPACE', { ...textStyle }).setOrigin(0.5).setDepth(30);
     this.tweens.add({ targets: this.title, y: 100, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.tweens.add({ targets: this.prompt, alpha: 0.2, duration: 600, yoyo: true, repeat: -1 });
   }
@@ -114,7 +114,7 @@ export default class Intro extends Phaser.Scene {
     this.tweens.killTweensOf([this.title, this.prompt]);
     this.tweens.add({ targets: [this.title, this.prompt], alpha: 0, y: '-=40', duration: 300 });
 
-    const text = this.add.text(0, 0, 'GET OFF MY MOUNTAIN!', { ...textStyle, fontSize: '26px', color: '#1b263b', strokeThickness: 0 })
+    const text = this.add.text(0, 0, 'GET OFF MY MOUNTAIN!', { ...textStyle, color: '#1b263b', strokeThickness: 0 })
       .setOrigin(0.5);
     const width = text.width + 40;
     const height = text.height + 28;
@@ -125,7 +125,7 @@ export default class Intro extends Phaser.Scene {
     bubble.lineBetween(width / 2 - 30, height / 2, width / 2 - 10, height / 2 + 30);
     bubble.lineBetween(width / 2 - 70, height / 2, width / 2 - 10, height / 2 + 30);
 
-    this.bubble = this.add.container(yetiX - 170, groundY - yetiHeight - 70, [bubble, text]).setDepth(30).setScale(0);
+    this.bubble = this.add.container(yetiX - 170, groundY - this.yeti.displayHeight - 70, [bubble, text]).setDepth(30).setScale(0);
     this.tweens.add({ targets: this.bubble, scale: 1, duration: 300, ease: 'Back.out' });
     this.tweens.add({
       targets: this.yeti,
@@ -157,15 +157,15 @@ export default class Intro extends Phaser.Scene {
     this.needle.fillRect(-2, -6, 4, 40).strokeRect(-2, -6, 4, 40);
     this.needle.setPosition(meterX, meterY);
 
-    const label = this.add.text(gameWidth / 2, meterY - 52, 'KICK POWER', { ...textStyle, fontSize: '28px' }).setOrigin(0.5);
-    const soft = this.add.text(meterX, meterY + 50, 'soft = land near the top', { ...textStyle, fontSize: '16px', color: '#80ed99' });
-    const hard = this.add.text(meterX + meterWidth, meterY + 50, 'hard = way down', { ...textStyle, fontSize: '16px', color: '#ef476f' })
-      .setOrigin(1, 0);
-    this.landText = this.add.text(gameWidth / 2, meterY + 96, '', { ...textStyle, fontSize: '22px' }).setOrigin(0.5);
-    const stop = this.add.text(gameWidth / 2, meterY + 130, 'SPACE to stop the needle', { ...textStyle, fontSize: '16px' }).setOrigin(0.5);
+    const label = this.add.text(gameWidth / 2, meterY - 76, 'KICK POWER', { ...textStyle, fontSize: '24px' }).setOrigin(0.5);
+    const stop = this.add.text(gameWidth / 2, meterY - 44, 'SPACE to stop the needle', textStyle).setOrigin(0.5);
     this.tweens.add({ targets: stop, alpha: 0.2, duration: 500, yoyo: true, repeat: -1 });
+    const soft = this.add.text(meterX, meterY + 46, 'SOFT', { ...textStyle, color: '#80ed99' });
+    const hard = this.add.text(meterX + meterWidth, meterY + 46, 'HARD', { ...textStyle, color: '#ef476f' }).setOrigin(1, 0);
+    const tip = this.add.text(gameWidth / 2, meterY + 86, 'softer kick = land higher!', { ...textStyle, color: '#ffd60a' }).setOrigin(0.5);
+    this.landText = this.add.text(gameWidth / 2, meterY + 118, '', textStyle).setOrigin(0.5);
 
-    this.meter = this.add.container(0, 0, [bar, this.needle, label, soft, hard, this.landText, stop]).setDepth(30).setAlpha(0);
+    this.meter = this.add.container(0, 0, [bar, this.needle, label, stop, soft, hard, tip, this.landText]).setDepth(30).setAlpha(0);
     this.tweens.add({ targets: this.meter, alpha: 1, duration: 250 });
   }
 
@@ -177,7 +177,7 @@ export default class Intro extends Phaser.Scene {
 
   stopMeter() {
     this.step = 'kick';
-    this.landText.setText(`kick ${Math.round(this.kick * 100)}%  -  landing at ${this.landAltitude(this.kick)} m`);
+    this.landText.setText(`kick ${Math.round(this.kick * 100)}% - landing at ${this.landAltitude(this.kick)} m`);
     this.tweens.add({ targets: this.needle, alpha: 0.2, duration: 80, yoyo: true, repeat: 3 });
 
     this.time.delayedCall(700, () => {
@@ -234,7 +234,7 @@ export default class Intro extends Phaser.Scene {
 
   showFlight() {
     const flight = world.summitAltitude - this.landAltitude(this.kick);
-    const text = this.add.text(gameWidth / 2, 200, `he flew ${flight} m!`, { ...textStyle, fontSize: '44px', color: '#ffd60a', strokeThickness: 8 })
+    const text = this.add.text(gameWidth / 2, 200, `he flew ${flight} m!`, { ...textStyle, fontSize: '32px', color: '#ffd60a', strokeThickness: 6 })
       .setOrigin(0.5)
       .setDepth(30)
       .setScale(0);

@@ -95,11 +95,12 @@ export default class End extends Phaser.Scene {
   }
 
   makeMugs() {
+    const handY = groundY - this.yeti.displayHeight * 0.45;
     const meetX = (playerX + yetiX) / 2;
-    const meetY = groundY - 90;
+    const meetY = handY - 20;
 
-    const mugLeft = this.add.image(playerX + 18, groundY - 50, tex.beer).setFlipX(true).setDepth(6);
-    const mugRight = this.add.image(yetiX - 34, groundY - 80, tex.beer).setScale(2).setDepth(6);
+    const mugLeft = this.add.image(playerX + 18, groundY - 34, tex.beer).setFlipX(true).setDepth(6);
+    const mugRight = this.add.image(yetiX - this.yeti.displayWidth * 0.4, handY, tex.beer).setScale(2).setDepth(6);
 
     this.foam = this.add.particles(0, 0, tex.dot, {
       speed: { min: 60, max: 200 },
@@ -148,7 +149,7 @@ export default class End extends Phaser.Scene {
 
     this.prosted = true;
     sfx.fanfare();
-    const prost = this.add.text(gameWidth / 2, 80, 'PROST!', { ...textStyle, fontSize: '72px', color: '#ffd60a', strokeThickness: 12 })
+    const prost = this.add.text(gameWidth / 2, 80, 'PROST!', { ...textStyle, fontSize: '64px', color: '#ffd60a', strokeThickness: 10 })
       .setOrigin(0.5)
       .setDepth(30)
       .setScale(0);
@@ -190,8 +191,8 @@ export default class End extends Phaser.Scene {
 
     rows.forEach(([name, value], i) => {
       const y = top + 22 + i * 40;
-      const label = this.add.text(left + 20, y, name, { ...textStyle, fontSize: '22px', color: '#caf0f8' }).setDepth(21);
-      const number = this.add.text(left + 280, y, value, { ...textStyle, fontSize: '26px' }).setOrigin(1, 0).setDepth(21);
+      const label = this.add.text(left + 20, y, name, { ...textStyle, color: '#caf0f8' }).setDepth(21);
+      const number = this.add.text(left + 280, y, value, textStyle).setOrigin(1, 0).setDepth(21);
       [label, number].forEach((text) => {
         text.setAlpha(0).x -= 20;
         this.tweens.add({ targets: text, alpha: 1, x: '+=20', duration: 250, delay: 300 + i * 250 });
@@ -201,7 +202,7 @@ export default class End extends Phaser.Scene {
 
     const done = 300 + rows.length * 250;
     if (this.newBest) {
-      const banner = this.add.text(left + 150, top + 220, 'NEW BEST!', { ...textStyle, fontSize: '34px', color: '#80ed99', strokeThickness: 8 })
+      const banner = this.add.text(left + 150, top + 220, 'NEW BEST!', { ...textStyle, fontSize: '24px', color: '#80ed99', strokeThickness: 6 })
         .setOrigin(0.5)
         .setDepth(21)
         .setScale(0);
@@ -211,7 +212,7 @@ export default class End extends Phaser.Scene {
 
     this.time.delayedCall(done + 400, () => {
       this.ready = true;
-      const again = this.add.text(gameWidth / 2, 505, 'press SPACE to go again', { ...textStyle, fontSize: '22px' }).setOrigin(0.5).setDepth(21);
+      const again = this.add.text(gameWidth / 2, 505, 'press SPACE to go again', textStyle).setOrigin(0.5).setDepth(21);
       this.tweens.add({ targets: again, alpha: 0.2, duration: 600, yoyo: true, repeat: -1 });
     });
   }

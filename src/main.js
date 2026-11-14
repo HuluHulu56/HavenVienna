@@ -6,15 +6,18 @@ import Climb from './scenes/Climb.js';
 import Hud from './scenes/Hud.js';
 import End from './scenes/End.js';
 
-const game = new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'game',
-  width: gameWidth,
-  height: gameHeight,
-  backgroundColor: '#87c5e8',
-  pixelArt: true,
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [Boot, Intro, Climb, Hud, End],
-});
+function start() {
+  window.game = new Phaser.Game({
+    type: Phaser.AUTO,
+    parent: 'game',
+    width: gameWidth,
+    height: gameHeight,
+    backgroundColor: '#87c5e8',
+    pixelArt: true,
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scene: [Boot, Intro, Climb, Hud, End],
+  });
+}
 
-window.game = game;
+// phaser text needs the pixel font ready before it draws
+document.fonts.load('16px "Press Start 2P"').then(start, start);

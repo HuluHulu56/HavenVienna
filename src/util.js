@@ -7,10 +7,9 @@ export function formatTime(seconds) {
 }
 
 export const textStyle = {
-  fontFamily: '"Trebuchet MS", Verdana, sans-serif',
-  fontSize: '20px',
-  fontStyle: 'bold',
+  fontFamily: '"Press Start 2P", "Courier New", monospace',
+  fontSize: '16px',
   color: '#ffffff',
   stroke: '#1b263b',
-  strokeThickness: 5,
+  strokeThickness: 4,
 };
