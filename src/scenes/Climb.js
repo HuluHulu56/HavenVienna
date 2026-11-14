@@ -183,9 +183,10 @@ export default class Climb extends Phaser.Scene {
   throwSnowball(tourist) {
     const player = this.player;
     const fromY = tourist.y - 30;
-    const dx = player.x - tourist.x;
+    const time = Phaser.Math.Clamp(Math.abs(player.x - tourist.x) / 340, 0.4, 1.1);
+    // aim a bit ahead of where you're going
+    const dx = player.x + player.vx * time * 0.8 - tourist.x;
     const dy = player.y - 22 - fromY;
-    const time = Phaser.Math.Clamp(Math.abs(dx) / 260, 0.5, 1.4);
     const sprite = this.add.image(tourist.x, fromY, tex.snowball).setDepth(9);
     this.snowballs.push({ sprite, x: tourist.x, y: fromY, vx: dx / time, vy: (dy - 300 * time * time) / time, age: 0 });
     sfx.throwBall();

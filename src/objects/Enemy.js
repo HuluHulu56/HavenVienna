@@ -58,10 +58,11 @@ export default class Enemy {
       this.sprite.setFlipX(player.x < this.x);
       this.sprite.angle = Math.sin(this.scene.time.now / 90) * 4;
       this.throwWait -= dt;
-      const close = Math.abs(player.x - this.x) < 420 && Math.abs(player.y - this.y) < 250;
+      const close = Math.abs(player.x - this.x) < 520 && Math.abs(player.y - this.y) < 300;
       if (close && this.throwWait <= 0) {
-        this.throwWait = Phaser.Math.FloatBetween(2.2, 3.4);
+        this.throwWait = Phaser.Math.FloatBetween(1.3, 2.2);
         this.scene.throwSnowball(this);
+        if (Math.random() < 0.35) this.scene.time.delayedCall(180, () => !this.dead && this.scene.throwSnowball(this));
       }
     }
 

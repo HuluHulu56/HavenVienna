@@ -32,7 +32,7 @@ export const pogo = {
   rockDrain: 0.09,
   hitDrain: 0.08,
   yetiDrain: 0.13,
-  snowballDrain: 0.05,
+  snowballDrain: 0.07,
   stompRecharge: 0.28,
   stompBonus: 50,
   superTime: 8,
