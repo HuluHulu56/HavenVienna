@@ -12,7 +12,9 @@ const yetiX = 700;
 const crossX = 840;
 const ringStart = 190;
 const ringTarget = 36;
-const ringTime = 1.6;
+const ringMin = 8;
+const ringTime = 1.25;
+const ringCrossing = (ringStart - ringTarget) / (ringStart - ringMin);
 const sky = [0x3f8fd2, 0x4f9fda, 0x62ade0, 0x77bbe6, 0x8ecae6, 0xa8d8ec];
 
 const ridge = [
@@ -48,7 +50,6 @@ export default class Intro extends Phaser.Scene {
     this.step = 'title';
     this.kick = 1;
     this.hopping = true;
-    this.ringLeft = 0;
     this.braced = false;
 
     this.makeSky();
@@ -302,7 +303,7 @@ export default class Intro extends Phaser.Scene {
   showBrace() {
     if (this.step === 'brace') return;
     this.step = 'brace';
-    this.ringLeft = ringTime;
+    this.ringElapsed = 0;
     this.braced = false;
     this.kick = 1;
 
@@ -316,13 +317,13 @@ export default class Intro extends Phaser.Scene {
     this.tweens.add({ targets: this.braceHint, alpha: 0.3, duration: 450, yoyo: true, repeat: -1 });
   }
 
-  brace(missed = false) {
+  brace() {
     if (this.braced) return;
     this.braced = true;
     const radius = this.ring.radius;
-    // late counts double since there's less room to be late than early
+    // The inside of the target has less room for error.
     const off = radius < ringTarget ? (ringTarget - radius) * 2 : radius - ringTarget;
-    this.kick = missed ? 1 : Phaser.Math.Clamp(off / 70, 0, 1);
+    this.kick = Phaser.Math.Clamp(off / 70, 0, 1);
     const grade = grades.find((g) => this.kick < g.upTo);
 
     sfx.tick();
@@ -338,6 +339,7 @@ export default class Intro extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(31).setScale(0);
     this.tweens.add({ targets: call, scale: 1, duration: 220, ease: 'Back.out' });
     this.tweens.add({ targets: call, alpha: 0, y: call.y - 20, delay: 1000, duration: 300 });
+    this.time.delayedCall(500, () => this.kickNow());
   }
 
   landAltitude(kick) {
@@ -352,8 +354,6 @@ export default class Intro extends Phaser.Scene {
     [this.ring, this.target, this.braceTitle, this.braceHint].forEach((item) => {
       this.tweens.add({ targets: item, alpha: 0, duration: 150, onComplete: () => item.destroy() });
     });
-    if (!this.braced) this.brace(true);
-
     this.tweens.add({
       targets: this.yeti,
       x: heroX + 120,
@@ -531,14 +531,15 @@ export default class Intro extends Phaser.Scene {
       this.beer.setPosition(this.yeti.x - 46, this.yeti.y - 74).setAngle(this.yeti.angle);
     }
 
-    if (this.step !== 'brace') return;
+    if (this.step !== 'brace' || this.braced) return;
 
-    // ring closes in while the yeti winds up his kick
-    this.ringLeft -= dt;
-    const t = Phaser.Math.Clamp(1 - this.ringLeft / ringTime, 0, 1);
-    this.ring.setRadius(Math.max(2, ringStart * (1 - t)));
+    this.ringElapsed = (this.ringElapsed + dt) % (2 * ringTime);
+    const t = 1 - Math.abs(1 - this.ringElapsed / ringTime);
+    const radius = t < ringCrossing
+      ? Phaser.Math.Linear(ringStart, ringTarget, Phaser.Math.Easing.Sine.In(t / ringCrossing))
+      : Phaser.Math.Linear(ringTarget, ringMin, Phaser.Math.Easing.Sine.Out((t - ringCrossing) / (1 - ringCrossing)));
+    this.ring.setRadius(radius);
     this.yeti.angle = -t * 12;
     this.yeti.x = yetiX + t * 20;
-    if (this.ringLeft <= 0) this.kickNow();
   }
 }
