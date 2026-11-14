@@ -37,6 +37,7 @@ export default class End extends Phaser.Scene {
     this.makeSummit();
     this.makeCharacters();
     this.makeTitle();
+    this.makePlaque();
     this.makeBook();
 
     this.cameras.main.fadeIn(500, 255, 255, 255);
@@ -157,6 +158,18 @@ export default class End extends Phaser.Scene {
     this.title = this.add.container(gameWidth / 2, 64, parts).setDepth(20).setScale(0);
   }
 
+  makePlaque() {
+    const frame = this.add.graphics();
+    frame.fillStyle(0x263046).fillRect(0, 0, 210, 70);
+    frame.fillStyle(0xfff1d7).fillRect(4, 4, 202, 62);
+    frame.lineStyle(2, 0x8eafc6).strokeRect(8, 8, 194, 54);
+    frame.fillStyle(0xd6a047).fillRect(179, 19, 4, 32).fillRect(168, 29, 26, 4);
+
+    const name = this.add.text(16, 16, 'ZUGSPITZE', { ...textStyle, fontSize: '12px', color: '#263046', strokeThickness: 0 });
+    const altitude = this.add.text(16, 40, '2,962 m', { ...textStyle, fontSize: '12px', color: '#263046', strokeThickness: 0 });
+    this.plaque = this.add.container(24, 24, [frame, name, altitude]).setDepth(20).setScale(0);
+  }
+
   makeBook() {
     const page = this.textures.exists('logbook')
       ? this.add.image(0, 0, 'logbook')
@@ -271,6 +284,7 @@ export default class End extends Phaser.Scene {
     if (this.clinks === 1) {
       sfx.fanfare();
       this.tweens.add({ targets: this.title, scale: 1, duration: 450, ease: 'Back.out' });
+      this.tweens.add({ targets: this.plaque, scale: 1, duration: 400, delay: 250, ease: 'Back.out' });
       this.tweens.add({ targets: this.title, y: 70, duration: 1200, delay: 450, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
       this.time.delayedCall(500, () => this.openBook());
     }
