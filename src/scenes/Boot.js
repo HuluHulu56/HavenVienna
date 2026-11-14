@@ -13,6 +13,10 @@ export default class Boot extends Phaser.Scene {
     this.load.image('fox', 'assets/fox.png');
     this.load.image('tourist', 'assets/tourist.png');
     this.load.image('snowball', 'assets/snowball.png');
+    this.load.image('coil', 'assets/coil.png');
+    this.load.image('golden', 'assets/golden.png');
+    this.load.image('pretzel', 'assets/pretzel.png');
+    this.load.image('beer', 'assets/beer.png');
   }
 
   create() {
